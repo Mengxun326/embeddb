@@ -9,6 +9,13 @@
     "node": ">=16.0.0"
   },
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "napi build --platform --release",
+    "prepublishOnly": "napi build --platform --release"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/Mengxun326/embeddb.git",
