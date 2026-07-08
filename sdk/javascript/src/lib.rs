@@ -1,6 +1,5 @@
 //! EmbedDB JavaScript/Node.js SDK — native napi-rs bindings.
 
-use embeddb_core::collection::IndexType;
 use embeddb_core::config::{CollectionConfig, Document, SearchQuery};
 use embeddb_core::db::Database;
 use embeddb_core::DistanceMetric;
@@ -38,16 +37,17 @@ impl EmbedDb {
         &self,
         collection: String,
         id: Option<String>,
-        vector: Vec<f32>,
+        vector: Vec<f64>,
         metadata: Option<String>,
     ) -> napi::Result<String> {
         let db = self.db.lock().unwrap();
         let db = db.as_ref().ok_or_else(|| napi::Error::from_reason("Database closed"))?;
+        let vec_f32: Vec<f32> = vector.into_iter().map(|v| v as f32).collect();
         let meta: Option<serde_json::Value> = metadata
             .map(|s| serde_json::from_str(&s).unwrap_or(serde_json::Value::String(s)));
         let doc = Document {
             id,
-            vector: Some(vector),
+            vector: Some(vec_f32),
             metadata: meta,
             text: None,
         };
@@ -58,13 +58,14 @@ impl EmbedDb {
     pub fn search(
         &self,
         collection: String,
-        vector: Vec<f32>,
+        vector: Vec<f64>,
         top_k: Option<u32>,
         filter: Option<String>,
     ) -> napi::Result<Vec<SearchResultJs>> {
         let db = self.db.lock().unwrap();
         let db = db.as_ref().ok_or_else(|| napi::Error::from_reason("Database closed"))?;
-        let mut query = SearchQuery::with_vector(vector, top_k.unwrap_or(10) as usize);
+        let vec_f32: Vec<f32> = vector.into_iter().map(|v| v as f32).collect();
+        let mut query = SearchQuery::with_vector(vec_f32, top_k.unwrap_or(10) as usize);
         if let Some(f) = filter { query = query.with_filter(f); }
         let hits = embeddb_core::search(db, &collection, query)
             .map_err(|e| napi::Error::from_reason(e.to_string()))?;
