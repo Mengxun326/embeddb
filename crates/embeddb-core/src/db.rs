@@ -175,6 +175,16 @@ impl Database {
         })
     }
 
+    /// Trigger a WAL checkpoint if the threshold has been reached.
+    pub fn maybe_checkpoint(&self) -> Result<()> {
+        if self.wal.needs_checkpoint() {
+            self.wal.checkpoint(&self.path).map_err(|e| {
+                Error::Other(format!("WAL checkpoint failed: {}", e))
+            })?;
+        }
+        Ok(())
+    }
+
     /// Close the database, flushing all data to disk.
     pub fn close(&self) -> Result<()> {
         self.page_cache.flush_all().map_err(Error::Storage)?;
@@ -249,6 +259,9 @@ impl Database {
         }
 
         self.page_cache.flush_page(catalog_page).map_err(Error::Storage)?;
+
+        // Auto-checkpoint WAL if threshold reached
+        let _ = self.maybe_checkpoint();
 
         Ok(())
     }

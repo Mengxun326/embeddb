@@ -1,0 +1,21 @@
+[package]
+name = "embeddb-py"
+version = "0.3.0"
+edition = "2021"
+license = "MIT"
+description = "EmbedDB Python SDK — embedded vector database"
+
+[lib]
+name = "embeddb"
+crate-type = ["cdylib"]
+
+[dependencies]
+embeddb-core = { path = "../../crates/embeddb-core" }
+pyo3 = { version = "0.22", features = ["extension-module"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

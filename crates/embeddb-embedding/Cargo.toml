@@ -3,17 +3,18 @@ name = "embeddb-embedding"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "EmbedDB ONNX embedding engine (Phase 2, feature-gated)"
+description = "EmbedDB text embedding engine (hash-based + optional ONNX)"
 
 [features]
 default = []
-embedding = []  # Will activate ort, tokenizers, hf-hub in Phase 2
+# Enable ONNX Runtime integration (requires libonnxruntime installed)
+onnx = []  # "ort", "tokenizers", "hf-hub"
 
 [dependencies]
 embeddb-core = { path = "../embeddb-core" }
 serde.workspace = true
 thiserror.workspace = true
-# Will be activated in Phase 2:
-# ort = { version = "2", optional = true }
-# tokenizers = { version = "0.21", optional = true }
-# hf-hub = { version = "0.4", optional = true }
+
+# Future: ort = { version = "2", optional = true }
+# Future: tokenizers = { version = "0.21", optional = true }
+# Future: hf-hub = { version = "0.4", optional = true }

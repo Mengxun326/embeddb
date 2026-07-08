@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
 
 [project]
 name = "embeddb"
-version = "0.2.0"
+version = "0.3.0"
 description = "EmbedDB Python SDK — embedded vector database"
 readme = "README.md"
 license = {text = "MIT"}
@@ -18,13 +18,18 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Rust",
     "Topic :: Database",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "pytest-asyncio"]
+dev = ["pytest>=7"]
 
 [project.urls]
 Homepage = "https://github.com/Mengxun326/embeddb"
 Issues = "https://github.com/Mengxun326/embeddb/issues"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+python-source = "."

@@ -268,6 +268,11 @@ impl WalManager {
         self.path.exists()
     }
 
+    /// Check if a checkpoint is needed (frame count exceeds threshold).
+    pub fn needs_checkpoint(&self) -> bool {
+        *self.frame_count.lock() >= self.checkpoint_threshold
+    }
+
     /// Delete the WAL file (e.g., after a clean shutdown with full checkpoint).
     pub fn remove(&self) -> Result<()> {
         if self.path.exists() {
