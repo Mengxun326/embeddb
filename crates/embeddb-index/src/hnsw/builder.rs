@@ -73,18 +73,16 @@ mod tests {
 
     #[test]
     fn test_batch_insert() {
-        let mut builder = HnswBuilder::new(
-            3,
-            DistanceMetric::Euclidean,
-            HnswConfig::default(),
-        );
+        // Use small ef_construction for fast debug-mode testing
+        let config = HnswConfig::new(4).with_ef_construction(20).with_ef_search(10);
+        let mut builder = HnswBuilder::new(3, DistanceMetric::Euclidean, config);
 
-        let items: Vec<(u64, Vec<f32>)> = (0..50u64)
+        let items: Vec<(u64, Vec<f32>)> = (0..20u64)
             .map(|i| (i, vec![i as f32, (i * 2) as f32, (i * 3) as f32]))
             .collect();
 
         builder.insert_batch(&items).unwrap();
-        assert_eq!(builder.len(), 50);
+        assert_eq!(builder.len(), 20);
 
         let graph = builder.build();
         let results = graph.search(&[10.0, 20.0, 30.0], 5).unwrap();

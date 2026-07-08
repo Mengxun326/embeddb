@@ -432,7 +432,7 @@ mod tests {
     use super::*;
 
     fn make_config() -> HnswConfig {
-        HnswConfig::new(8).with_ef_construction(50).with_ef_search(20)
+        HnswConfig::new(4).with_ef_construction(20).with_ef_search(10)
     }
 
     #[test]

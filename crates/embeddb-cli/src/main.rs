@@ -5,6 +5,9 @@ use embeddb_core::config::{CollectionConfig, Document, SearchQuery};
 use embeddb_core::db::Database;
 use std::path::PathBuf;
 
+#[tokio::main]
+async fn main() {
+
 /// EmbedDB CLI — SQLite for vectors.
 #[derive(Parser)]
 #[command(name = "embeddb")]
@@ -107,7 +110,6 @@ enum Commands {
     },
 }
 
-fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
@@ -128,7 +130,7 @@ fn main() {
         } => cmd_search(&cli.path, &collection, vector, top_k, filter, &format),
         Commands::Info => cmd_info(&cli.path),
         Commands::Stats { collection } => cmd_stats(&cli.path, collection),
-        Commands::Serve { host, port } => cmd_serve(&cli.path, &host, port),
+        Commands::Serve { host, port } => cmd_serve(&cli.path, &host, port).await,
         Commands::Delete { collection, id } => cmd_delete(&cli.path, &collection, &id),
     };
 
@@ -298,10 +300,11 @@ fn cmd_stats(
     Ok(())
 }
 
-fn cmd_serve(path: &std::path::Path, host: &str, port: u16) -> Result<(), String> {
-    println!("Web dashboard is coming in Phase 2!");
-    println!("Would serve database {} on {}:{}", path.display(), host, port);
-    Ok(())
+async fn cmd_serve(path: &std::path::Path, host: &str, port: u16) -> Result<(), String> {
+    let db_path = path.display().to_string();
+    embeddb_server::serve(&db_path, host, port)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 fn cmd_delete(path: &std::path::Path, collection: &str, id: &str) -> Result<(), String> {

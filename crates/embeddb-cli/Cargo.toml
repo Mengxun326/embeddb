@@ -11,6 +11,8 @@ path = "src/main.rs"
 
 [dependencies]
 embeddb-core = { path = "../embeddb-core" }
+embeddb-server = { path = "../embeddb-server" }
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tokio = { version = "1", features = ["full"] }

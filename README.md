@@ -36,31 +36,31 @@ EmbedDB is an **embedded vector database** — it runs inside your application p
 
 ## Features
 
-### Phase 0 (v0.1.0) — Current
+### Phase 0 (v0.1.0)
 
 - [x] **Embedded engine** — Single-file database, link as a Rust library or run the CLI
 - [x] **Page-based storage** — SQLite-inspired 4KB page format with CRC integrity checks
 - [x] **Write-Ahead Log** — Crash-safe writes with automatic recovery
-- [x] **Snapshot isolation** — Multiple concurrent readers, single writer
 - [x] **Flat (brute-force) search** — Exact nearest neighbors with Cosine, Euclidean, Dot Product
 - [x] **Metadata filtering** — SQL-like expressions: `category = "tech" AND score > 5.0`
 - [x] **C FFI layer** — Foundation for all language bindings (Python, JS, Go, Java)
 - [x] **CLI tool** — `embeddb init | insert | search | info | stats | delete`
-- [x] **57 unit tests** — Comprehensive test coverage across all crates
 
-### Phase 1 (v0.2.0) — In Development
+### Phase 1 (v0.2.0)
 
-- [ ] **HNSW index** — Approximate nearest neighbor search, 10-100x faster at scale
-- [ ] **SIMD acceleration** — AVX2 / NEON distance kernels
-- [ ] **Persistent collections** — Collections survive process restarts
-- [ ] **Benchmark suite** — ANN-Benchmarks with SIFT-1M, GLOVE-100
+- [x] **HNSW index** — Approximate nearest neighbor search, 10-100x faster at scale
+- [x] **SIMD acceleration** — AVX2 (x86_64) / NEON (aarch64) distance kernels
+- [x] **Persistent collections** — Collections survive process restarts
+- [x] **74 unit tests** — Comprehensive coverage across all crates
 
-### Phase 2 (v0.3.0)
+### Phase 2 (v0.3.0) — Current
 
-- [ ] **ONNX embedding engine** — Built-in text embedding (all-MiniLM-L6-v2, 384d)
-- [ ] **Web Dashboard** — React SPA for visual management
-- [ ] **Python SDK** — `pip install embeddb`
-- [ ] **JavaScript SDK** — `npm install embeddb`
+- [x] **HTTP API Server** — Axum-based REST API with JSON endpoints
+- [x] **Web Dashboard** — Built-in management UI (served from binary)
+- [x] **Python SDK** — Native bindings via ctypes over C FFI
+- [x] **JavaScript/TypeScript SDK** — napi-rs native module with type definitions
+- [ ] **ONNX embedding engine** — Built-in text embedding (requires onnxruntime)
+- [ ] **npm/pip publishing** — Publish to package registries
 
 ### Phase 3 (v1.0.0)
 

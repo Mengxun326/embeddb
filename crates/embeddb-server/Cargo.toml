@@ -8,9 +8,15 @@ description = "EmbedDB web dashboard HTTP server (Phase 2)"
 [dependencies]
 embeddb-core = { path = "../embeddb-core" }
 serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
-# Will be activated in Phase 2:
-# axum.workspace = true
-# tokio.workspace = true
-# tower-http.workspace = true
-# rust-embed.workspace = true
+axum = { version = "0.7", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.5", features = ["cors", "fs"] }
+tower = "0.4"
+parking_lot = "0.12"
+
+[dev-dependencies]
+tempfile = "3"
+hyper = { version = "1", features = ["client", "server"] }
+tower = { version = "0.4", features = ["util"] }
