@@ -19,12 +19,12 @@ jobs:
       - name: Install maturin
         run: pip install maturin
 
-      - name: Build wheel
+      - name: Build wheel + sdist
         working-directory: sdk/python
-        run: maturin build --release
+        run: maturin build --release && maturin sdist
 
       - name: Publish to PyPI
-        run: pip install twine && twine upload sdk/python/target/wheels/*.whl
+        run: pip install twine && twine upload sdk/python/target/wheels/*.whl sdk/python/target/wheels/*.tar.gz
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
