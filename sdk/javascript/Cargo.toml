@@ -5,6 +5,9 @@ edition = "2021"
 license = "MIT"
 description = "EmbedDB JavaScript/Node.js SDK — native napi-rs bindings"
 
+# Independent workspace (not part of the root workspace)
+[workspace]
+
 [lib]
 crate-type = ["cdylib"]
 
