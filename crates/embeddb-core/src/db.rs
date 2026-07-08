@@ -1,11 +1,13 @@
 //! Database — the top-level handle for an EmbedDB database.
 //!
 //! A Database manages collections and coordinates the storage engine,
-//! indexes, and metadata stores.
+//! indexes, and metadata stores. Collections are persisted to the
+//! catalog page so they survive process restarts.
 
 use crate::collection::Collection;
 use crate::config::{CollectionConfig, CollectionStats, DatabaseConfig, DatabaseStats, Document, SearchHit, SearchQuery};
 use crate::error::{Error, Result};
+use embeddb_storage::format::PageType;
 use embeddb_storage::page_cache::{CacheConfig, PageCache};
 use embeddb_storage::wal::WalManager;
 use parking_lot::RwLock;
@@ -25,7 +27,6 @@ pub struct Database {
     wal: Arc<WalManager>,
     /// Collections (name → collection).
     collections: RwLock<HashMap<String, Arc<RwLock<Collection>>>>,
-    /// Database configuration.
     /// Database configuration.
     #[allow(dead_code)]
     config: DatabaseConfig,
@@ -58,7 +59,6 @@ impl Database {
         // Try to recover from WAL if it exists
         if wal.exists() {
             if let Err(e) = wal.recover(&path) {
-                // Log the error but continue — the database may still be usable
                 log::warn!("WAL recovery failed: {}", e);
             }
         }
@@ -68,14 +68,23 @@ impl Database {
 
         let wal = Arc::new(wal);
 
-        Ok(Self {
+        let db = Self {
             path,
             page_cache,
             wal,
             collections: RwLock::new(HashMap::new()),
             config,
-        })
+        };
+
+        // Load persisted collections from catalog
+        db.load_catalog()?;
+
+        Ok(db)
     }
+
+    // ------------------------------------------------------------------
+    // Collection management
+    // ------------------------------------------------------------------
 
     /// Create a new collection.
     pub fn create_collection(&self, config: CollectionConfig) -> Result<()> {
@@ -85,13 +94,15 @@ impl Database {
             return Err(Error::CollectionAlreadyExists(config.name));
         }
 
-        let collection = Collection::new(config);
+        let collection = Collection::new(config.clone());
         collections.insert(
-            collection.name().to_string(),
+            config.name.clone(),
             Arc::new(RwLock::new(collection)),
         );
 
-        Ok(())
+        // Persist to catalog
+        drop(collections);
+        self.persist_collection(&config)
     }
 
     /// Get a collection by name.
@@ -109,7 +120,8 @@ impl Database {
         collections
             .remove(name)
             .ok_or_else(|| Error::CollectionNotFound(name.to_string()))?;
-        Ok(())
+        drop(collections);
+        self.remove_collection_from_catalog(name)
     }
 
     /// Check if a collection exists.
@@ -139,7 +151,7 @@ impl Database {
                 dimension: col.dimension(),
                 distance: format!("{:?}", col.distance_metric()),
                 vector_count: col.vector_count(),
-                metadata_count: 0, // Will be populated when metadata is persisted
+                metadata_count: 0,
             });
         }
 
@@ -155,10 +167,8 @@ impl Database {
 
     /// Close the database, flushing all data to disk.
     pub fn close(&self) -> Result<()> {
-        // Flush page cache
         self.page_cache.flush_all().map_err(Error::Storage)?;
 
-        // Checkpoint WAL and remove
         self.wal.checkpoint(&self.path).map_err(|e| {
             Error::Other(format!("WAL checkpoint failed: {}", e))
         })?;
@@ -177,6 +187,136 @@ impl Database {
     /// Get the page cache (for advanced use).
     pub fn page_cache(&self) -> &Arc<PageCache> {
         &self.page_cache
+    }
+
+    // ------------------------------------------------------------------
+    // Catalog persistence
+    // ------------------------------------------------------------------
+
+    /// Ensure the catalog page exists (allocate if first collection).
+    fn ensure_catalog_page(&self) -> Result<u64> {
+        let header = self.page_cache.db_header().map_err(Error::Storage)?;
+        if header.catalog_root_page != 0 {
+            return Ok(header.catalog_root_page);
+        }
+
+        // Allocate a new catalog page
+        let page_id = self
+            .page_cache
+            .allocate_page(PageType::Catalog, 0)
+            .map_err(Error::Storage)?;
+
+        // Update DbHeader with catalog root
+        let mut header = self.page_cache.db_header().map_err(Error::Storage)?;
+        header.catalog_root_page = page_id;
+        self.page_cache
+            .update_db_header(&header)
+            .map_err(Error::Storage)?;
+
+        Ok(page_id)
+    }
+
+    /// Persist a single collection config to the catalog page.
+    fn persist_collection(&self, config: &CollectionConfig) -> Result<()> {
+        let catalog_page = self.ensure_catalog_page()?;
+
+        // Serialize config to JSON
+        let json = serde_json::to_vec(config).map_err(|e| {
+            Error::Other(format!("Failed to serialize collection config: {}", e))
+        })?;
+
+        // Write as a cell on the catalog page
+        self.page_cache
+            .write_cell(catalog_page, &json, None)
+            .map_err(Error::Storage)?;
+
+        self.page_cache.flush_page(catalog_page).map_err(Error::Storage)?;
+
+        Ok(())
+    }
+
+    /// Remove a collection from the catalog by rebuilding the catalog without it.
+    fn remove_collection_from_catalog(&self, name: &str) -> Result<()> {
+        let header = self.page_cache.db_header().map_err(Error::Storage)?;
+        if header.catalog_root_page == 0 {
+            return Ok(());
+        }
+
+        // Read existing configurations
+        let configs = self.read_catalog_configs(header.catalog_root_page)?;
+
+        // Filter out the removed collection
+        let remaining: Vec<&CollectionConfig> = configs
+            .iter()
+            .filter(|c| c.name != name)
+            .collect();
+
+        // Allocate a new catalog page
+        let new_page = self
+            .page_cache
+            .allocate_page(PageType::Catalog, 0)
+            .map_err(Error::Storage)?;
+
+        // Write remaining configs
+        for config in remaining {
+            let json = serde_json::to_vec(config).map_err(|e| {
+                Error::Other(format!("Failed to serialize: {}", e))
+            })?;
+
+            self.page_cache
+                .write_cell(new_page, &json, None)
+                .map_err(Error::Storage)?;
+        }
+
+        // Update DbHeader
+        let mut header = self.page_cache.db_header().map_err(Error::Storage)?;
+        header.catalog_root_page = new_page;
+        self.page_cache
+            .update_db_header(&header)
+            .map_err(Error::Storage)?;
+
+        self.page_cache.flush_page(new_page).map_err(Error::Storage)?;
+
+        Ok(())
+    }
+
+    /// Load all collections from the catalog page.
+    fn load_catalog(&self) -> Result<()> {
+        let header = self.page_cache.db_header().map_err(Error::Storage)?;
+        if header.catalog_root_page == 0 {
+            return Ok(()); // No collections yet
+        }
+
+        let configs = self.read_catalog_configs(header.catalog_root_page)?;
+
+        let mut collections = self.collections.write();
+        for config in configs {
+            let collection = Collection::new(config);
+            collections.insert(
+                collection.name().to_string(),
+                Arc::new(RwLock::new(collection)),
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Read all collection configs from a catalog page.
+    fn read_catalog_configs(&self, page_id: u64) -> Result<Vec<CollectionConfig>> {
+        let page = self.page_cache.get_page(page_id).map_err(Error::Storage)?;
+        let pg = page.read();
+        let header = pg.header();
+
+        let mut configs = Vec::new();
+        for i in 0..header.num_cells {
+            if let Some(data) = pg.cell_data(i) {
+                if let Ok(config) = serde_json::from_slice::<CollectionConfig>(&data) {
+                    configs.push(config);
+                }
+            }
+        }
+
+        Ok(configs)
     }
 }
 
@@ -225,6 +365,50 @@ mod tests {
         let col = col.read();
         assert_eq!(col.name(), "docs");
         assert_eq!(col.dimension(), 4);
+    }
+
+    #[test]
+    fn test_collection_persistence() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.embeddb");
+
+        // Create a DB, add collection
+        {
+            let db = Database::open(&path).unwrap();
+            db.create_collection(CollectionConfig::new("persistent", 128)).unwrap();
+            db.close().unwrap();
+        }
+
+        // Reopen and verify collection still exists
+        {
+            let db = Database::open(&path).unwrap();
+            assert!(db.collection_exists("persistent"));
+
+            let col = db.get_collection("persistent").unwrap();
+            let col = col.read();
+            assert_eq!(col.name(), "persistent");
+            assert_eq!(col.dimension(), 128);
+        }
+    }
+
+    #[test]
+    fn test_drop_collection_persists() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.embeddb");
+
+        {
+            let db = Database::open(&path).unwrap();
+            db.create_collection(CollectionConfig::new("temp", 3)).unwrap();
+            db.create_collection(CollectionConfig::new("keep", 3)).unwrap();
+            db.drop_collection("temp").unwrap();
+            db.close().unwrap();
+        }
+
+        {
+            let db = Database::open(&path).unwrap();
+            assert!(!db.collection_exists("temp"));
+            assert!(db.collection_exists("keep"));
+        }
     }
 
     #[test]

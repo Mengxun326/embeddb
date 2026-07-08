@@ -188,6 +188,7 @@ version = "0.1.0"
 dependencies = [
  "bytemuck",
  "embeddb-storage",
+ "fastrand",
  "log",
  "parking_lot",
  "rand",
