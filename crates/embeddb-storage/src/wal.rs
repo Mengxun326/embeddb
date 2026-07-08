@@ -168,6 +168,7 @@ impl WalManager {
 
         // Auto-checkpoint if threshold exceeded
         let _should_checkpoint = *count >= self.checkpoint_threshold;
+        drop(count);
 
         Ok(frame_seq)
     }

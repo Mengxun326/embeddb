@@ -4,7 +4,7 @@
 //! indexes, and metadata stores. Collections are persisted to the
 //! catalog page so they survive process restarts.
 
-use crate::collection::Collection;
+use crate::collection::{Collection, IndexType};
 use crate::config::{CollectionConfig, CollectionStats, DatabaseConfig, DatabaseStats, Document, SearchHit, SearchQuery};
 use crate::error::{Error, Result};
 use embeddb_storage::format::PageType;
@@ -89,7 +89,7 @@ impl Database {
     // Collection management
     // ------------------------------------------------------------------
 
-    /// Create a new collection.
+    /// Create a new collection with persistent storage.
     pub fn create_collection(&self, config: CollectionConfig) -> Result<()> {
         let mut collections = self.collections.write();
 
@@ -97,15 +97,21 @@ impl Database {
             return Err(Error::CollectionAlreadyExists(config.name));
         }
 
-        let collection = Collection::new(config.clone());
+        // Create with persistent storage
+        let collection = Collection::new_persistent(
+            config.clone(), IndexType::Flat, self.page_cache.clone(),
+        )?;
+
+        // Get updated config with allocated page IDs
+        let updated_config = collection.config_snapshot();
         collections.insert(
-            config.name.clone(),
+            updated_config.name.clone(),
             Arc::new(RwLock::new(collection)),
         );
 
-        // Persist to catalog
+        // Persist the updated config (with page IDs) to catalog
         drop(collections);
-        self.persist_collection(&config)
+        self.persist_collection(&updated_config)
     }
 
     /// Get a collection by name.
@@ -298,7 +304,7 @@ impl Database {
         Ok(())
     }
 
-    /// Load all collections from the catalog page.
+    /// Load all collections from the catalog page (with persistent data).
     fn load_catalog(&self) -> Result<()> {
         let header = self.page_cache.db_header().map_err(Error::Storage)?;
         if header.catalog_root_page == 0 {
@@ -309,9 +315,11 @@ impl Database {
 
         let mut collections = self.collections.write();
         for config in configs {
-            let collection = Collection::new(config);
+            let collection = Collection::new_persistent(
+                config.clone(), IndexType::Flat, self.page_cache.clone(),
+            )?;
             collections.insert(
-                collection.name().to_string(),
+                config.name.clone(),
                 Arc::new(RwLock::new(collection)),
             );
         }

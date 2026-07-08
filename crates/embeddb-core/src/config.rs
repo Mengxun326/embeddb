@@ -42,6 +42,14 @@ pub struct CollectionConfig {
     /// Optional description.
     #[serde(default)]
     pub description: String,
+
+    /// Page ID for the vector data page (0 = not yet allocated).
+    #[serde(default)]
+    pub data_root_page: u64,
+
+    /// Page ID for the metadata page (0 = not yet allocated).
+    #[serde(default)]
+    pub metadata_root_page: u64,
 }
 
 fn default_distance() -> DistanceMetric {
@@ -56,6 +64,8 @@ impl CollectionConfig {
             dimension,
             distance: DistanceMetric::Cosine,
             description: String::new(),
+            data_root_page: 0,
+            metadata_root_page: 0,
         }
     }
 
