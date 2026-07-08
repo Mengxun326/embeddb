@@ -1,11 +1,11 @@
 # EmbedDB
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0--rc1-blue.svg" alt="Version">
+  <img src="https://img.shields.io/github/v/tag/Mengxun326/embeddb?label=version&color=blue" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
   <img src="https://img.shields.io/badge/rust-stable%201.80+-orange.svg" alt="Rust">
   <img src="https://img.shields.io/badge/tests-70%20passed-brightgreen.svg" alt="Tests">
-  <img src="https://img.shields.io/badge/status-v1.0.0--rc1-blue.svg" alt="Status">
+  <a href="https://github.com/Mengxun326/embeddb/actions"><img src="https://img.shields.io/github/actions/workflow/status/Mengxun326/embeddb/ci.yml?branch=master" alt="CI"></a>
 </p>
 
 <p align="center">
@@ -25,9 +25,9 @@ EmbedDB is an **embedded vector database** — it runs inside your application p
 |---|:---:|:---:|:---:|:---:|
 | **Embedded (no server)** | ✅ | ✅ | ✅ | ❌ |
 | **Single file** | ✅ | ❌ | ✅ | ❌ |
-| **Built-in embedding** | 🔜 v0.2 | ✅ | ❌ | ❌ |
-| **CLI tool** | ✅ | ❌ | ❌ | ❌ |
-| **Web Dashboard** | 🔜 v0.2 | ❌ | ❌ | ✅ |
+| **Built-in embedding** | ✅ | ✅ | ❌ | ❌ |
+| **CLI tool** | ✅ | ❌ | ❌ | ✅ |
+| **Web Dashboard** | ✅ | ❌ | ❌ | ✅ |
 | **Multi-language SDK** | 🔜 v0.2 | Python | Python/Rust/JS | Python/Rust/Go |
 | **Hybrid search** | 🔜 v0.3 | ❌ | ✅ | ✅ |
 | **Crash safe (WAL)** | ✅ | ❌ | ✅ | ✅ |
