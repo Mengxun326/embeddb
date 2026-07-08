@@ -81,6 +81,7 @@ impl Database {
 
         // Load persisted collections from catalog
         db.load_catalog()?;
+        init_id_counter(&db);
 
         Ok(db)
     }
@@ -344,6 +345,19 @@ impl Database {
 
         Ok(configs)
     }
+}
+
+/// Initialize the auto-increment ID counter from the database state.
+/// Called after loading all collections to ensure IDs don't collide.
+fn init_id_counter(db: &Database) {
+    let collections = db.collections.read();
+    let max_id: u64 = collections.values()
+        .map(|c| c.read().vector_count() as u64)
+        .max()
+        .unwrap_or(0);
+    // Start IDs well past the max loaded vector count
+    crate::collection::reset_doc_id_counter(max_id + 1000);
+    drop(collections);
 }
 
 /// Convenience helper to insert a document into a collection.

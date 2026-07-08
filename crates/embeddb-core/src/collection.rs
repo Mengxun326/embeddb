@@ -151,6 +151,8 @@ fn decode_metadata_cell(data: &[u8]) -> Option<(String, serde_json::Value)> {
 
 static NEXT_DOC_ID: AtomicU64 = AtomicU64::new(1);
 fn next_doc_id() -> u64 { NEXT_DOC_ID.fetch_add(1, Ordering::Relaxed) }
+/// Reset the counter to avoid ID collisions with persisted data (called after loading).
+pub fn reset_doc_id_counter(start: u64) { NEXT_DOC_ID.store(start, Ordering::Relaxed); }
 
 pub struct Collection {
     config: CollectionConfig,
