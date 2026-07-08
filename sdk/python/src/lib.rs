@@ -3,13 +3,12 @@ use vexra_core::DistanceMetric;
 use vexra_core::db::Database;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::PyDict;
 use std::sync::Arc;
 
 #[pyclass]
 struct EmbedDB {
     db: Arc<Database>,
-    path: String,
 }
 
 #[pymethods]
@@ -17,9 +16,10 @@ impl EmbedDB {
     #[new]
     fn new(path: &str) -> PyResult<Self> {
         let db = Database::open(path).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-        Ok(Self { db: Arc::new(db), path: path.to_string() })
+        Ok(Self { db: Arc::new(db) })
     }
 
+    #[pyo3(signature = (name, dim, distance=None))]
     fn create_collection(&self, name: &str, dim: usize, distance: Option<&str>) -> PyResult<PyCollection> {
         let metric = match distance.unwrap_or("cosine") {
             "euclidean" => DistanceMetric::Euclidean, "dot" => DistanceMetric::DotProduct, _ => DistanceMetric::Cosine,
@@ -42,7 +42,7 @@ impl EmbedDB {
 
     fn close(&self) -> PyResult<()> { self.db.close().map_err(|e| PyRuntimeError::new_err(e.to_string())) }
     fn __enter__(slf: Py<Self>) -> Py<Self> { slf }
-    fn __exit__(&self, _: PyObject, _: PyObject, _: PyObject) {}
+    fn __exit__(&self, _exc_type: PyObject, _exc_val: PyObject, _exc_tb: PyObject) {}
 }
 
 #[pyclass]
@@ -61,12 +61,14 @@ impl PyCollection {
     #[getter]
     fn dimension(&self) -> usize { self.dim }
 
+    #[pyo3(signature = (vector, id=None))]
     fn insert(&self, vector: Vec<f32>, id: Option<String>) -> PyResult<String> {
         let doc = Document { id, vector: Some(vector), metadata: None, text: None };
         vexra_core::insert(&self.db, &self.name, doc)
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
 
+    #[pyo3(signature = (vector, top_k=None))]
     fn search(&self, vector: Vec<f32>, top_k: Option<usize>) -> PyResult<Vec<PyObject>> {
         let hits = vexra_core::search(&self.db, &self.name, SearchQuery::with_vector(vector, top_k.unwrap_or(10)))
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
@@ -83,7 +85,9 @@ impl PyCollection {
 
     fn delete(&self, id: &str) -> PyResult<()> {
         let col = self.db.get_collection(&self.name).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-        col.write().delete(id).map_err(|e| PyRuntimeError::new_err(e.to_string()))
+        let result = col.write().delete(id).map_err(|e| PyRuntimeError::new_err(e.to_string()));
+        drop(col);
+        result
     }
 
     fn __len__(&self) -> PyResult<usize> {
