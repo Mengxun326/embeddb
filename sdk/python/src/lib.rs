@@ -36,8 +36,8 @@ impl EmbedDB {
         Ok(r)
     }
 
-    fn list_collections(&self) -> PyResult<Vec<String>> {
-        self.db.list_collections().map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    fn list_collections(&self) -> Vec<String> {
+        self.db.list_collections()
     }
 
     fn close(&self) -> PyResult<()> { self.db.close().map_err(|e| PyRuntimeError::new_err(e.to_string())) }
@@ -88,9 +88,8 @@ impl PyCollection {
 
     fn __len__(&self) -> PyResult<usize> {
         let col = self.db.get_collection(&self.name).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-        let c = col.read();
-        let n = c.vector_count();
-        drop(c);
+        let guard = col.read();
+        let n = guard.vector_count();
         Ok(n)
     }
 
