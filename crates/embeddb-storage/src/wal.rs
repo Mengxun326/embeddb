@@ -166,8 +166,7 @@ impl WalManager {
         let mut count = self.frame_count.lock();
         *count += 1;
 
-        // Auto-checkpoint if threshold exceeded
-        let _should_checkpoint = *count >= self.checkpoint_threshold;
+        // Track frame count (auto-checkpoint handled by Database::maybe_checkpoint)
         drop(count);
 
         Ok(frame_seq)
@@ -350,6 +349,10 @@ impl WalManager {
                 frame_header[8], frame_header[9], frame_header[10], frame_header[11],
             ]);
 
+            // Read stored checksums for validation
+            let stored_cs1 = u32::from_le_bytes([frame_header[20],frame_header[21],frame_header[22],frame_header[23]]);
+            let stored_cs2 = u32::from_le_bytes([frame_header[24],frame_header[25],frame_header[26],frame_header[27]]);
+
             // Read page data
             let page_offset = offset + WAL_FRAME_HEADER_SIZE as u64;
             if page_offset + self.page_size as u64 > file_len {
@@ -359,6 +362,15 @@ impl WalManager {
             file.seek(SeekFrom::Start(page_offset))?;
             let mut page_data = vec![0u8; self.page_size as usize];
             file.read_exact(&mut page_data)?;
+
+            // Verify checksums
+            let (computed_cs1, computed_cs2) = Self::compute_frame_checksum(
+                page_number, &page_data, self.salt1, self.salt2, 0,
+            );
+            if computed_cs1 != stored_cs1 || computed_cs2 != stored_cs2 {
+                log::warn!("WAL frame checksum mismatch at offset {}: page {}", offset, page_number);
+                break; // Stop recovery here; data beyond this point may be corrupt
+            }
 
             frames.push(WalFrame {
                 page_number,

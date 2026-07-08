@@ -50,6 +50,14 @@ pub struct CollectionConfig {
     /// Page ID for the metadata page (0 = not yet allocated).
     #[serde(default)]
     pub metadata_root_page: u64,
+
+    /// Index type: "flat" or "hnsw".
+    #[serde(default = "default_index_type")]
+    pub index_type: String,
+}
+
+fn default_index_type() -> String {
+    "flat".to_string()
 }
 
 fn default_distance() -> DistanceMetric {
@@ -66,6 +74,7 @@ impl CollectionConfig {
             description: String::new(),
             data_root_page: 0,
             metadata_root_page: 0,
+            index_type: "flat".to_string(),
         }
     }
 

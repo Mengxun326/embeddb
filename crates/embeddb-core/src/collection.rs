@@ -136,6 +136,20 @@ fn encode_metadata_cell(id: &str, metadata: &serde_json::Value) -> Vec<u8> {
     buf
 }
 
+/// Create a tombstone cell (zero-length payload) marking a deleted document.
+fn make_tombstone_cell(id: &str) -> Vec<u8> {
+    let id_bytes = id.as_bytes();
+    let mut buf = Vec::with_capacity(4 + id_bytes.len());
+    buf.extend_from_slice(&(id_bytes.len() as u32).to_le_bytes());
+    buf.extend_from_slice(id_bytes);
+    buf
+}
+
+/// Check if a cell is a tombstone (payload matches id prefix with no extra data).
+fn is_tombstone(data: &[u8], id_len: usize) -> bool {
+    data.len() == 4 + id_len
+}
+
 fn decode_metadata_cell(data: &[u8]) -> Option<(String, serde_json::Value)> {
     if data.len() < 4 { return None; }
     let id_len = u32::from_le_bytes([data[0],data[1],data[2],data[3]]) as usize;
@@ -165,6 +179,26 @@ pub struct Collection {
 }
 
 impl Collection {
+    /// Collect all tombstone document IDs from a page.
+    fn collect_tombstones(&self, pg: &embeddb_storage::page_cache::CachedPage) -> std::collections::HashSet<String> {
+        let mut set = std::collections::HashSet::new();
+        let header = pg.header();
+        for i in 0..header.num_cells {
+            if let Some(data) = pg.cell_data(i) {
+                if data.len() >= 4 {
+                    let id_len = u32::from_le_bytes([data[0],data[1],data[2],data[3]]) as usize;
+                    if is_tombstone(&data, id_len) {
+                        if let Ok(id) = std::str::from_utf8(&data[4..4+id_len]) {
+                            set.insert(id.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        set
+    }
+
+    /// Create a new... (continues below)
     /// Create a new in-memory collection (legacy / test use).
     pub fn new(config: CollectionConfig) -> Self {
         Self::with_index(config, IndexType::default())
@@ -236,9 +270,18 @@ impl Collection {
         let pg = page.read();
         let header = pg.header();
 
+        // Track tombstones to skip deleted documents
+        let tombstones = self.collect_tombstones(&pg);
+
         for i in 0..header.num_cells {
             if let Some(data) = pg.cell_data(i) {
+                // Skip tombstone cells (zero-length payload beyond id prefix)
+                if data.len() >= 4 {
+                    let id_len = u32::from_le_bytes([data[0],data[1],data[2],data[3]]) as usize;
+                    if is_tombstone(&data, id_len) { continue; }
+                }
                 if let Some((doc_id, internal_id, vector)) = decode_vector_cell(&data) {
+                    if tombstones.contains(&doc_id) { continue; }
                     let _ = self.index.insert(internal_id, &vector);
                     self.id_map.insert(doc_id.clone(), internal_id);
                     self.reverse_id_map.insert(internal_id, doc_id);
@@ -385,9 +428,23 @@ impl Collection {
         if let Some(&internal_id) = self.id_map.get(id) {
             let _ = self.index.remove(internal_id);
             self.reverse_id_map.remove(&internal_id);
+
+            // Write zero-length tombstone cell to mark deletion on disk
+            if let Some(ref pc) = self.page_cache {
+                let tombstone = make_tombstone_cell(id);
+                let _ = pc.write_cell(self.config.data_root_page, &tombstone, None);
+            }
         }
         self.id_map.remove(id);
         let _ = self.metadata.remove(id);
+
+        // Write metadata tombstone
+        if let Some(ref pc) = self.page_cache {
+            if self.config.metadata_root_page != 0 {
+                let tombstone = make_tombstone_cell(id);
+                let _ = pc.write_cell(self.config.metadata_root_page, &tombstone, None);
+            }
+        }
         Ok(())
     }
 

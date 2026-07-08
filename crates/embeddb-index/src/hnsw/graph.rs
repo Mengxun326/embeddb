@@ -281,12 +281,13 @@ impl HnswGraph {
         impl Eq for Candidate {}
         impl PartialOrd for Candidate {
             fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-                self.score.partial_cmp(&other.score)
+                Some(self.cmp(other))
             }
         }
         impl Ord for Candidate {
             fn cmp(&self, other: &Self) -> Ordering {
-                self.partial_cmp(other).unwrap_or(Ordering::Equal)
+                // Use total_cmp for strict total ordering (handles NaN correctly)
+                self.score.total_cmp(&other.score)
             }
         }
 

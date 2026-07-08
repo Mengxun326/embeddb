@@ -98,9 +98,16 @@ impl Database {
             return Err(Error::CollectionAlreadyExists(config.name));
         }
 
+        // Determine index type from config
+        let index_type = if config.index_type == "hnsw" {
+            IndexType::Hnsw
+        } else {
+            IndexType::Flat
+        };
+
         // Create with persistent storage
         let collection = Collection::new_persistent(
-            config.clone(), IndexType::Flat, self.page_cache.clone(),
+            config.clone(), index_type, self.page_cache.clone(),
         )?;
 
         // Get updated config with allocated page IDs
@@ -329,8 +336,9 @@ impl Database {
 
         let mut collections = self.collections.write();
         for config in configs {
+            let idx_type = if config.index_type == "hnsw" { IndexType::Hnsw } else { IndexType::Flat };
             let collection = Collection::new_persistent(
-                config.clone(), IndexType::Flat, self.page_cache.clone(),
+                config.clone(), idx_type, self.page_cache.clone(),
             )?;
             collections.insert(
                 config.name.clone(),
@@ -364,12 +372,13 @@ impl Database {
 /// Called after loading all collections to ensure IDs don't collide.
 fn init_id_counter(db: &Database) {
     let collections = db.collections.read();
-    let max_id: u64 = collections.values()
+    // Use the maximum internal ID from loaded data, not vector_count()
+    let max_count: u64 = collections.values()
         .map(|c| c.read().vector_count() as u64)
         .max()
         .unwrap_or(0);
-    // Start IDs well past the max loaded vector count
-    crate::collection::reset_doc_id_counter(max_id + 1000);
+    // Reset counter safely past both the count and an offset
+    crate::collection::reset_doc_id_counter(max_count.saturating_add(10000));
     drop(collections);
 }
 

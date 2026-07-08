@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "embeddb"
-version = "0.3.0"
+version = "1.0.0-beta"
 description = "EmbedDB Python SDK — embedded vector database"
 readme = "README.md"
 license = {text = "MIT"}

@@ -1,12 +1,12 @@
 [package]
 name = "embeddb-py"
-version = "0.3.0"
+version = "1.0.0-beta"
 edition = "2021"
 license = "MIT"
 description = "EmbedDB Python SDK — embedded vector database"
 
 [lib]
-name = "embeddb"
+name = "_native"
 crate-type = ["cdylib"]
 
 [dependencies]

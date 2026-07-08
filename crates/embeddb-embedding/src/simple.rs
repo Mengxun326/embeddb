@@ -18,6 +18,7 @@ pub struct SimpleEmbedder {
 impl SimpleEmbedder {
     /// Create a new embedder with the given output dimension.
     pub fn new(dimension: usize) -> Self {
+        assert!(dimension > 0, "SimpleEmbedder dimension must be greater than 0");
         Self { dimension }
     }
 }

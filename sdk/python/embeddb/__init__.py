@@ -1,20 +1,20 @@
 """
-EmbedDB Python SDK
-
-EmbedDB is an embedded vector database — SQLite for vectors.
-One file, zero configuration, runs anywhere.
+EmbedDB Python SDK — embedded vector database.
 
 Quick start:
     import embeddb
-
     db = embeddb.Database("data.embeddb")
     col = db.create_collection("docs", dimension=384)
-    col.insert({"id": "doc1", "vector": [0.1] * 384})
+    col.insert({"vector": [0.1] * 384, "id": "doc1"})
     results = col.search(vector=[0.2] * 384, top_k=10)
+
+The native PyO3 module is loaded from `_native` (compiled by maturin).
 """
 
-from .client import Database, Collection, SearchResult
-from .config import CollectionConfig
+from embeddb._native import EmbedDB as Database, PyCollection
 
-__version__ = "0.2.0"
-__all__ = ["Database", "Collection", "SearchResult", "CollectionConfig"]
+# For backward compatibility: expose Collection as an alias
+Collection = PyCollection
+
+__version__ = "1.0.0-beta"
+__all__ = ["Database", "Collection", "PyCollection"]
