@@ -17,7 +17,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Publish to crates.io
         run: |
-          for crate in embeddb-storage embeddb-index embeddb-metadata embeddb-query embeddb-embedding embeddb-core embeddb-ffi embeddb-server embeddb-cli; do
+          for crate in vexra-storage vexra-index vexra-metadata vexra-query vexra-embedding vexra-core vexra-ffi vexra-server vexra-cli; do
             cargo publish -p $crate
           done
         env:
@@ -48,7 +48,7 @@ jobs:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
       - name: Build release binary
-        run: cargo build --release -p embeddb-cli --target ${{ matrix.target }}
+        run: cargo build --release -p vexra-cli --target ${{ matrix.target }}
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

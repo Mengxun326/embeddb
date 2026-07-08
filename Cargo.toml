@@ -1,15 +1,15 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/embeddb-core",
-    "crates/embeddb-storage",
-    "crates/embeddb-index",
-    "crates/embeddb-metadata",
-    "crates/embeddb-query",
-    "crates/embeddb-ffi",
-    "crates/embeddb-cli",
-    "crates/embeddb-server",
-    "crates/embeddb-embedding",
+    "crates/vexra-core",
+    "crates/vexra-storage",
+    "crates/vexra-index",
+    "crates/vexra-metadata",
+    "crates/vexra-query",
+    "crates/vexra-ffi",
+    "crates/vexra-cli",
+    "crates/vexra-server",
+    "crates/vexra-embedding",
 ]
 
 [workspace.package]

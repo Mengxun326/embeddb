@@ -1,0 +1,13 @@
+[package]
+name = "vexra-ffi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "EmbedDB C-compatible FFI layer"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+vexra-core = { path = "../vexra-core" }
+thiserror.workspace = true

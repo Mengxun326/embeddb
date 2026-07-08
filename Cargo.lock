@@ -429,125 +429,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91622ff5e7162018101f2fea40d6ebf4a78bbe5a49736a2020649edf9693679e"
 
 [[package]]
-name = "embeddb-cli"
-version = "1.0.0-rc1"
-dependencies = [
- "clap",
- "embeddb-core",
- "embeddb-embedding",
- "embeddb-server",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "embeddb-core"
-version = "1.0.0-rc1"
-dependencies = [
- "criterion",
- "embeddb-index",
- "embeddb-metadata",
- "embeddb-storage",
- "log",
- "parking_lot",
- "rand",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "embeddb-embedding"
-version = "1.0.0-rc1"
-dependencies = [
- "embeddb-core",
- "serde",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "embeddb-ffi"
-version = "1.0.0-rc1"
-dependencies = [
- "embeddb-core",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "embeddb-index"
-version = "1.0.0-rc1"
-dependencies = [
- "bytemuck",
- "embeddb-storage",
- "fastrand",
- "log",
- "parking_lot",
- "rand",
- "serde",
- "tempfile",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "embeddb-metadata"
-version = "1.0.0-rc1"
-dependencies = [
- "embeddb-storage",
- "log",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "embeddb-query"
-version = "1.0.0-rc1"
-dependencies = [
- "embeddb-core",
- "embeddb-index",
- "serde",
- "serde_json",
- "tantivy",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "embeddb-server"
-version = "1.0.0-rc1"
-dependencies = [
- "axum",
- "embeddb-core",
- "hyper",
- "parking_lot",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "tower 0.4.13",
- "tower-http",
-]
-
-[[package]]
-name = "embeddb-storage"
-version = "1.0.0-rc1"
-dependencies = [
- "bytemuck",
- "crc32fast",
- "fastrand",
- "log",
- "memmap2",
- "parking_lot",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.18",
-]
-
-[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1913,6 +1794,125 @@ dependencies = [
  "js-sys",
  "serde_core",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "vexra-cli"
+version = "1.0.0-rc1"
+dependencies = [
+ "clap",
+ "serde",
+ "serde_json",
+ "tokio",
+ "vexra-core",
+ "vexra-embedding",
+ "vexra-server",
+]
+
+[[package]]
+name = "vexra-core"
+version = "1.0.0-rc1"
+dependencies = [
+ "criterion",
+ "log",
+ "parking_lot",
+ "rand",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "vexra-index",
+ "vexra-metadata",
+ "vexra-storage",
+]
+
+[[package]]
+name = "vexra-embedding"
+version = "1.0.0-rc1"
+dependencies = [
+ "serde",
+ "thiserror 2.0.18",
+ "vexra-core",
+]
+
+[[package]]
+name = "vexra-ffi"
+version = "1.0.0-rc1"
+dependencies = [
+ "thiserror 2.0.18",
+ "vexra-core",
+]
+
+[[package]]
+name = "vexra-index"
+version = "1.0.0-rc1"
+dependencies = [
+ "bytemuck",
+ "fastrand",
+ "log",
+ "parking_lot",
+ "rand",
+ "serde",
+ "tempfile",
+ "thiserror 2.0.18",
+ "vexra-storage",
+]
+
+[[package]]
+name = "vexra-metadata"
+version = "1.0.0-rc1"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "vexra-storage",
+]
+
+[[package]]
+name = "vexra-query"
+version = "1.0.0-rc1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tantivy",
+ "thiserror 2.0.18",
+ "vexra-core",
+ "vexra-index",
+]
+
+[[package]]
+name = "vexra-server"
+version = "1.0.0-rc1"
+dependencies = [
+ "axum",
+ "hyper",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tower 0.4.13",
+ "tower-http",
+ "vexra-core",
+]
+
+[[package]]
+name = "vexra-storage"
+version = "1.0.0-rc1"
+dependencies = [
+ "bytemuck",
+ "crc32fast",
+ "fastrand",
+ "log",
+ "memmap2",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

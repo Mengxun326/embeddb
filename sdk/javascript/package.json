@@ -1,5 +1,5 @@
 {
-  "name": "embeddb",
+  "name": "vexra",
   "version": "1.0.0-rc1",
   "description": "EmbedDB JavaScript SDK — embedded vector database",
   "main": "index.js",
@@ -29,6 +29,6 @@
     "ann",
     "semantic-search",
     "rag",
-    "embeddb"
+    "vexra"
   ]
 }

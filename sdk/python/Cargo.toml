@@ -1,5 +1,5 @@
 [package]
-name = "embeddb-py"
+name = "vexra-py"
 version = "1.1.0"
 edition = "2021"
 license = "MIT"
@@ -10,7 +10,7 @@ name = "_native"
 crate-type = ["cdylib"]
 
 [dependencies]
-embeddb-core = { path = "../../crates/embeddb-core" }
+vexra-core = { path = "../../crates/vexra-core" }
 pyo3 = { version = "0.22", features = ["extension-module"] }
 serde_json = "1"
 

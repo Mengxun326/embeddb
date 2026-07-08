@@ -3,10 +3,10 @@
 //! Provides safe, idiomatic Python access to the EmbedDB embedded vector database.
 //! The Database is opened once and shared across all Collection handles via Arc.
 
-use embeddb_core::collection::IndexType;
-use embeddb_core::config::{CollectionConfig as CoreCollectionConfig, Document, SearchQuery};
-use embeddb_core::db::Database;
-use embeddb_core::DistanceMetric;
+use vexra_core::collection::IndexType;
+use vexra_core::config::{CollectionConfig as CoreCollectionConfig, Document, SearchQuery};
+use vexra_core::db::Database;
+use vexra_core::DistanceMetric;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -105,14 +105,14 @@ impl PyCollection {
         let text: Option<String> = doc.get_item("text").ok().flatten().map(|v| v.extract()).transpose()?;
 
         let core_doc = Document { id, vector: Some(vector), metadata, text };
-        embeddb_core::insert(&self.db, &self.name, core_doc)
+        vexra_core::insert(&self.db, &self.name, core_doc)
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
 
     fn search(&self, vector: Vec<f32>, top_k: Option<usize>, filter: Option<&str>) -> PyResult<Vec<PyDict>> {
         let mut query = SearchQuery::with_vector(vector, top_k.unwrap_or(10));
         if let Some(f) = filter { query = query.with_filter(f); }
-        let hits = embeddb_core::search(&self.db, &self.name, query)
+        let hits = vexra_core::search(&self.db, &self.name, query)
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         Python::with_gil(|py| {
             let results: Vec<PyDict> = hits.iter().map(|h| {

@@ -61,7 +61,7 @@ Examples:
 cargo test
 
 # Run tests for a specific crate
-cargo test -p embeddb-storage
+cargo test -p vexra-storage
 
 # Run with output
 cargo test -- --nocapture

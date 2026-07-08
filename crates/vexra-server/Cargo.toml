@@ -1,0 +1,22 @@
+[package]
+name = "vexra-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "EmbedDB web dashboard HTTP server (Phase 2)"
+
+[dependencies]
+vexra-core = { path = "../vexra-core" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+axum = { version = "0.7", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.5", features = ["cors", "fs"] }
+tower = "0.4"
+parking_lot = "0.12"
+
+[dev-dependencies]
+tempfile = "3"
+hyper = { version = "1", features = ["client", "server"] }
+tower = { version = "0.4", features = ["util"] }

@@ -1,8 +1,8 @@
 //! EmbedDB JavaScript/Node.js SDK — native napi-rs bindings.
 
-use embeddb_core::config::{CollectionConfig, Document, SearchQuery};
-use embeddb_core::db::Database;
-use embeddb_core::DistanceMetric;
+use vexra_core::config::{CollectionConfig, Document, SearchQuery};
+use vexra_core::db::Database;
+use vexra_core::DistanceMetric;
 use napi_derive::napi;
 use std::sync::Mutex;
 
@@ -51,7 +51,7 @@ impl EmbedDb {
             metadata: meta,
             text: None,
         };
-        embeddb_core::insert(db, &collection, doc).map_err(|e| napi::Error::from_reason(e.to_string()))
+        vexra_core::insert(db, &collection, doc).map_err(|e| napi::Error::from_reason(e.to_string()))
     }
 
     #[napi]
@@ -67,7 +67,7 @@ impl EmbedDb {
         let vec_f32: Vec<f32> = vector.into_iter().map(|v| v as f32).collect();
         let mut query = SearchQuery::with_vector(vec_f32, top_k.unwrap_or(10) as usize);
         if let Some(f) = filter { query = query.with_filter(f); }
-        let hits = embeddb_core::search(db, &collection, query)
+        let hits = vexra_core::search(db, &collection, query)
             .map_err(|e| napi::Error::from_reason(e.to_string()))?;
         Ok(hits.into_iter().map(|h| SearchResultJs {
             id: h.id,
