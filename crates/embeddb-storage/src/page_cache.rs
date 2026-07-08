@@ -367,6 +367,9 @@ impl PageCache {
         Ok(())
     }
 
+    /// Mark a page as free (reusable). Currently a no-op; Phase 6f will implement free-list.
+    pub fn free_page(&self, _page_id: u64) -> Result<()> { Ok(()) }
+
     /// Evict one page from the cache (simple: evict the first non-dirty page).
     fn evict_one(&self, pages: &mut HashMap<u64, Arc<RwLock<CachedPage>>>) {
         let victim = pages

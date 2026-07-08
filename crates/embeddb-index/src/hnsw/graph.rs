@@ -241,18 +241,101 @@ impl HnswGraph {
     }
 
     /// Get the graph configuration.
-    pub fn config(&self) -> &HnswConfig {
-        &self.config
-    }
-
+    pub fn config(&self) -> &HnswConfig { &self.config }
     /// Get the distance metric.
-    pub fn metric(&self) -> DistanceMetric {
-        self.metric
+    pub fn metric(&self) -> DistanceMetric { self.metric }
+    /// Get the vector dimension.
+    pub fn dimension(&self) -> usize { self.dimension }
+
+    // ------------------------------------------------------------------
+    // Persistence: save/load HNSW graph structure to page cells
+    // ------------------------------------------------------------------
+
+    /// Save the HNSW graph structure (edges, entry point, layers) to a page.
+    /// Returns the number of cells written.
+    /// Save the HNSW graph structure (edges, entry point, layers) to a page.
+    pub fn save_to_page(&self, page_cache: &embeddb_storage::page_cache::PageCache, page_id: u64) -> std::result::Result<usize, String> {
+        if page_id == 0 { return Err("Invalid page_id 0".into()); }
+
+        // Cell 0: entry point + global metadata
+        {
+            let mut data = Vec::new();
+            data.extend_from_slice(&self.entry_point.unwrap_or(0).to_le_bytes());
+            data.extend_from_slice(&(self.max_layer as u32).to_le_bytes());
+            data.extend_from_slice(&(self.nodes.len() as u32).to_le_bytes());
+            page_cache.write_cell(page_id, &data, Some(0)).map_err(|e| e.to_string())?;
+        }
+
+        // Cells 1..N: per-node neighbor lists
+        let mut cell_idx = 1u16;
+        for node in self.nodes.values() {
+            if node.tombstone { continue; }
+            let mut data = Vec::new();
+            data.extend_from_slice(&node.id.to_le_bytes());
+            data.extend_from_slice(&(node.max_layer as u32).to_le_bytes());
+            data.extend_from_slice(&(node.neighbors.len() as u32).to_le_bytes());
+            for (layer, neighbors) in node.neighbors.iter().enumerate() {
+                if neighbors.is_empty() { continue; }
+                data.extend_from_slice(&(layer as u32).to_le_bytes());
+                data.extend_from_slice(&(neighbors.len() as u32).to_le_bytes());
+                for &nid in neighbors { data.extend_from_slice(&nid.to_le_bytes()); }
+            }
+            page_cache.write_cell(page_id, &data, Some(cell_idx)).map_err(|e| e.to_string())?;
+            cell_idx += 1;
+        }
+        Ok(cell_idx as usize - 1)
     }
 
-    /// Get the vector dimension.
-    pub fn dimension(&self) -> usize {
-        self.dimension
+    /// Load HNSW graph structure from a page. Vectors must already be loaded.
+    pub fn load_from_page(
+        page_cache: &embeddb_storage::page_cache::PageCache, page_id: u64,
+        dimension: usize, metric: DistanceMetric, config: HnswConfig,
+    ) -> std::result::Result<Self, String> {
+        let mut graph = HnswGraph::new(dimension, metric, config);
+        if page_id == 0 { return Ok(graph); }
+        let page = page_cache.get_page(page_id).map_err(|e| e.to_string())?;
+        let pg = page.read();
+        let header = pg.header();
+        if let Some(data) = pg.cell_data(0) {
+            if data.len() >= 16 {
+                let ep = u64::from_le_bytes([data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7]]);
+                graph.entry_point = if ep > 0 { Some(ep) } else { None };
+                graph.max_layer = u32::from_le_bytes([data[8],data[9],data[10],data[11]]) as usize;
+            }
+        }
+        for i in 1..header.num_cells {
+            if let Some(data) = pg.cell_data(i) {
+                let (node_id, neighbors) = Self::decode_node_edge_cell(&data);
+                if let Some(existing) = graph.nodes.get_mut(&node_id) {
+                    existing.neighbors = neighbors;
+                    existing.max_layer = existing.neighbors.len().saturating_sub(1);
+                }
+            }
+        }
+        Ok(graph)
+    }
+
+    /// Decode a per-node edge cell. Returns (node_id, adjacency_lists).
+    fn decode_node_edge_cell(data: &[u8]) -> (u64, Vec<Vec<u64>>) {
+        if data.len() < 16 { return (0, vec![]); }
+        let node_id = u64::from_le_bytes([data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7]]);
+        let max_layer = u32::from_le_bytes([data[8],data[9],data[10],data[11]]) as usize;
+        let layer_count = u32::from_le_bytes([data[12],data[13],data[14],data[15]]) as usize;
+        let mut neighbors: Vec<Vec<u64>> = vec![Vec::new(); max_layer + 1];
+        let mut pos = 16;
+        for _ in 0..layer_count {
+            if pos + 8 > data.len() { break; }
+            let layer = u32::from_le_bytes([data[pos],data[pos+1],data[pos+2],data[pos+3]]) as usize;
+            let n_count = u32::from_le_bytes([data[pos+4],data[pos+5],data[pos+6],data[pos+7]]) as usize;
+            pos += 8;
+            for _ in 0..n_count {
+                if pos + 8 > data.len() { break; }
+                let nid = u64::from_le_bytes([data[pos],data[pos+1],data[pos+2],data[pos+3],data[pos+4],data[pos+5],data[pos+6],data[pos+7]]);
+                if layer < neighbors.len() { neighbors[layer].push(nid); }
+                pos += 8;
+            }
+        }
+        (node_id, neighbors)
     }
 
     // ------------------------------------------------------------------

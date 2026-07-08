@@ -279,12 +279,13 @@ impl Database {
     /// Remove a collection from the catalog by rebuilding the catalog without it.
     fn remove_collection_from_catalog(&self, name: &str) -> Result<()> {
         let header = self.page_cache.db_header().map_err(Error::Storage)?;
-        if header.catalog_root_page == 0 {
+        let old_page = header.catalog_root_page;
+        if old_page == 0 {
             return Ok(());
         }
 
         // Read existing configurations
-        let configs = self.read_catalog_configs(header.catalog_root_page)?;
+        let configs = self.read_catalog_configs(old_page)?;
 
         // Filter out the removed collection
         let remaining: Vec<&CollectionConfig> = configs
@@ -316,10 +317,9 @@ impl Database {
         // Update DbHeader
         let mut header = self.page_cache.db_header().map_err(Error::Storage)?;
         header.catalog_root_page = new_page;
-        self.page_cache
-            .update_db_header(&header)
-            .map_err(Error::Storage)?;
-
+        self.page_cache.update_db_header(&header).map_err(Error::Storage)?;
+        // Mark old catalog page for reuse
+        let _ = self.page_cache.free_page(old_page);
         self.page_cache.flush_page(new_page).map_err(Error::Storage)?;
 
         Ok(())

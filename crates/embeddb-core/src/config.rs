@@ -51,6 +51,10 @@ pub struct CollectionConfig {
     #[serde(default)]
     pub metadata_root_page: u64,
 
+    /// Page ID for HNSW edge data (0 = not yet allocated or not using HNSW).
+    #[serde(default)]
+    pub hnsw_edge_page: u64,
+
     /// Index type: "flat" or "hnsw".
     #[serde(default = "default_index_type")]
     pub index_type: String,
@@ -74,6 +78,7 @@ impl CollectionConfig {
             description: String::new(),
             data_root_page: 0,
             metadata_root_page: 0,
+            hnsw_edge_page: 0,
             index_type: "flat".to_string(),
         }
     }

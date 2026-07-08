@@ -242,18 +242,37 @@ impl Collection {
                 .map_err(Error::Storage)?;
         }
 
+        // Ensure HNSW edge page exists for HNSW collections
+        let hnsw_edge_page = if index_type == IndexType::Hnsw {
+            if config.hnsw_edge_page == 0 {
+                page_cache.allocate_page(PageType::HnswEdge, 0).map_err(Error::Storage)?
+            } else { config.hnsw_edge_page }
+        } else { 0 };
+        config.hnsw_edge_page = hnsw_edge_page;
+
+        let pc = page_cache.clone();
         let mut collection = Self {
             config,
             index: IndexBackend::new(dimension, distance, index_type),
             metadata: MetadataStore::new(name),
             id_map: HashMap::new(),
             reverse_id_map: HashMap::new(),
-            page_cache: Some(page_cache),
+            page_cache: Some(pc.clone()),
         };
 
-        // Load existing vectors and metadata from pages
+        // Load existing vectors and metadata
         collection.load_vectors()?;
         collection.load_metadata()?;
+
+        // Load HNSW graph edges if applicable
+        if index_type == IndexType::Hnsw && hnsw_edge_page != 0 {
+            if let IndexBackend::Hnsw(ref mut graph) = collection.index {
+                *graph = embeddb_index::hnsw::graph::HnswGraph::load_from_page(
+                    &pc, hnsw_edge_page, dimension, distance,
+                    embeddb_index::hnsw::HnswConfig::default(),
+                ).map_err(|e| Error::Other(e))?;
+            }
+        }
 
         Ok(collection)
     }
@@ -363,6 +382,13 @@ impl Collection {
                     .map_err(Error::Storage)?;
                 if !written {
                     return Err(Error::Other("Vector data page full".into()));
+                }
+
+                // Save HNSW graph edges if using HNSW
+                if let IndexBackend::Hnsw(ref graph) = self.index {
+                    if self.config.hnsw_edge_page != 0 {
+                        let _ = graph.save_to_page(pc, self.config.hnsw_edge_page);
+                    }
                 }
             }
         }
