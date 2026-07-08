@@ -126,6 +126,20 @@ enum Commands {
         port: u16,
     },
 
+    /// Export a collection to JSON
+    Export {
+        #[arg(short, long)]
+        collection: String,
+        #[arg(short, long)]
+        output: Option<String>,
+    },
+    /// Import vectors from a JSON file
+    Import {
+        #[arg(short, long)]
+        collection: String,
+        #[arg(short, long)]
+        file: String,
+    },
     /// Delete a document from a collection
     Delete {
         /// Collection name
@@ -152,6 +166,8 @@ enum Commands {
         Commands::Info => cmd_info(&cli.path),
         Commands::Stats { collection } => cmd_stats(&cli.path, collection),
         Commands::Serve { host, port } => cmd_serve(&cli.path, &host, port).await,
+        Commands::Export { collection, output } => cmd_export(&cli.path, &collection, output),
+        Commands::Import { collection, file } => cmd_import(&cli.path, &collection, &file),
         Commands::Delete { collection, id } => cmd_delete(&cli.path, &collection, &id),
     };
 
@@ -351,6 +367,43 @@ async fn cmd_serve(path: &std::path::Path, host: &str, port: u16) -> Result<(), 
     vexra_server::serve(&db_path, host, port)
         .await
         .map_err(|e| e.to_string())
+}
+
+fn cmd_export(path: &std::path::Path, collection: &str, output: Option<String>) -> Result<(), String> {
+    let db = Database::open(path).map_err(|e| e.to_string())?;
+    let col = db.get_collection(collection).map_err(|e| e.to_string())?;
+    let c = col.read();
+    let ids = c.list_ids();
+    let mut out: Vec<serde_json::Value> = Vec::new();
+    for id in ids {
+        let meta = c.get_metadata(id);
+        out.push(serde_json::json!({"id": id, "metadata": meta}));
+    }
+    let json = serde_json::to_string_pretty(&out).map_err(|e| e.to_string())?;
+    if let Some(f) = output {
+        std::fs::write(&f, json).map_err(|e| e.to_string())?;
+        println!("Exported {} documents to {}", out.len(), f);
+    } else {
+        println!("{}", json);
+    }
+    Ok(())
+}
+
+fn cmd_import(path: &std::path::Path, collection: &str, file: &str) -> Result<(), String> {
+    let db = Database::open(path).map_err(|e| e.to_string())?;
+    let data = std::fs::read_to_string(file).map_err(|e| e.to_string())?;
+    let docs: Vec<serde_json::Value> = serde_json::from_str(&data).map_err(|e| e.to_string())?;
+    let mut count = 0;
+    for doc in docs {
+        let id = doc["id"].as_str().map(|s| s.to_string());
+        let vector: Option<Vec<f32>> = doc["vector"].as_array().map(|a| a.iter().filter_map(|v| v.as_f64()).map(|f| f as f32).collect());
+        let meta = doc.get("metadata").cloned();
+        let d = Document { id, vector, metadata: meta, text: None };
+        vexra_core::insert(&db, collection, d).map_err(|e| e.to_string())?;
+        count += 1;
+    }
+    println!("Imported {} documents into '{}'", count, collection);
+    Ok(())
 }
 
 fn cmd_delete(path: &std::path::Path, collection: &str, id: &str) -> Result<(), String> {

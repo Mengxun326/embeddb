@@ -6,25 +6,50 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install maturin
-        run: pip install maturin
-
-      - name: Build wheel + sdist
-        working-directory: sdk/python
+        with: { python-version: '3.11' }
+      - run: pip install maturin
+      - working-directory: sdk/python
         run: maturin build --release && maturin sdist
+      - run: pip install twine && twine upload sdk/python/target/wheels/*.whl sdk/python/target/wheels/*.tar.gz
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
 
-      - name: Publish to PyPI
-        run: pip install twine && twine upload sdk/python/target/wheels/*.whl sdk/python/target/wheels/*.tar.gz
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install maturin
+      - working-directory: sdk/python
+        run: maturin build --release
+      - run: pip install twine && twine upload sdk/python/target/wheels/*.whl
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install maturin
+      - working-directory: sdk/python
+        run: maturin build --release
+      - run: pip install twine && twine upload sdk/python/target/wheels/*.whl
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
