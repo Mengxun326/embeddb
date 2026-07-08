@@ -16,7 +16,7 @@ Be respectful, constructive, and inclusive. Harassment of any kind will not be t
 ### Setup
 
 ```bash
-git clone https://github.com/Mengxun326/embeddb.git
+git clone https://github.com/Mengxun326/Vexra.git
 cd embeddb
 cargo build
 cargo test
@@ -28,7 +28,7 @@ EmbedDB is a Rust workspace with 9 crates. See [README.md](README.md#project-str
 
 ## Development Workflow
 
-1. **Find an issue** — Check [good first issue](https://github.com/Mengxun326/embeddb/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) or open a new one
+1. **Find an issue** — Check [good first issue](https://github.com/Mengxun326/Vexra/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) or open a new one
 2. **Fork & branch** — `git checkout -b feature/your-feature`
 3. **Code & test** — Write code + tests. Run `cargo test` and `cargo clippy` before committing
 4. **Commit** — Use descriptive commit messages
@@ -103,4 +103,4 @@ cargo bench
 
 ## Questions?
 
-Open a [GitHub Discussion](https://github.com/Mengxun326/embeddb/discussions) or ask in an issue. We're happy to help!
+Open a [GitHub Discussion](https://github.com/Mengxun326/Vexra/discussions) or ask in an issue. We're happy to help!

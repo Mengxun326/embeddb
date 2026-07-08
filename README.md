@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Mengxun326/embeddb/actions"><img src="https://img.shields.io/github/actions/workflow/status/Mengxun326/embeddb/ci.yml?branch=master" alt="CI"></a>
+  <a href="https://github.com/Mengxun326/Vexra/actions"><img src="https://img.shields.io/github/actions/workflow/status/Mengxun326/Vexra/ci.yml?branch=master" alt="CI"></a>
   <a href="https://crates.io/crates/vexra-core"><img src="https://img.shields.io/crates/v/vexra-core?label=crates.io" alt="crates.io"></a>
   <a href="https://www.npmjs.com/package/@mengxun326/vexra"><img src="https://img.shields.io/npm/v/@mengxun326/vexra?label=npm" alt="npm"></a>
   <a href="https://pypi.org/project/vexra/"><img src="https://img.shields.io/pypi/v/vexra?label=pypi" alt="PyPI"></a>
@@ -92,8 +92,8 @@ vexra/
 
 ## 社区
 
-- [Issues](https://github.com/Mengxun326/embeddb/issues)
-- [Discussions](https://github.com/Mengxun326/embeddb/discussions)
+- [Issues](https://github.com/Mengxun326/Vexra/issues)
+- [Discussions](https://github.com/Mengxun326/Vexra/discussions)
 - [CHANGELOG](CHANGELOG.md) · [CONTRIBUTING](CONTRIBUTING.md) · [SECURITY](SECURITY.md)
 
 ## 许可证
