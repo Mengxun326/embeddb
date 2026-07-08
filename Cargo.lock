@@ -430,10 +430,11 @@ checksum = "91622ff5e7162018101f2fea40d6ebf4a78bbe5a49736a2020649edf9693679e"
 
 [[package]]
 name = "embeddb-cli"
-version = "0.1.0"
+version = "1.0.0-rc1"
 dependencies = [
  "clap",
  "embeddb-core",
+ "embeddb-embedding",
  "embeddb-server",
  "serde",
  "serde_json",
@@ -442,7 +443,7 @@ dependencies = [
 
 [[package]]
 name = "embeddb-core"
-version = "0.1.0"
+version = "1.0.0-rc1"
 dependencies = [
  "criterion",
  "embeddb-index",
@@ -459,7 +460,7 @@ dependencies = [
 
 [[package]]
 name = "embeddb-embedding"
-version = "0.1.0"
+version = "1.0.0-rc1"
 dependencies = [
  "embeddb-core",
  "serde",
@@ -468,7 +469,7 @@ dependencies = [
 
 [[package]]
 name = "embeddb-ffi"
-version = "0.1.0"
+version = "1.0.0-rc1"
 dependencies = [
  "embeddb-core",
  "thiserror 2.0.18",
@@ -476,7 +477,7 @@ dependencies = [
 
 [[package]]
 name = "embeddb-index"
-version = "0.1.0"
+version = "1.0.0-rc1"
 dependencies = [
  "bytemuck",
  "embeddb-storage",
@@ -491,7 +492,7 @@ dependencies = [
 
 [[package]]
 name = "embeddb-metadata"
-version = "0.1.0"
+version = "1.0.0-rc1"
 dependencies = [
  "embeddb-storage",
  "log",
@@ -503,7 +504,7 @@ dependencies = [
 
 [[package]]
 name = "embeddb-query"
-version = "0.1.0"
+version = "1.0.0-rc1"
 dependencies = [
  "embeddb-core",
  "embeddb-index",
@@ -515,7 +516,7 @@ dependencies = [
 
 [[package]]
 name = "embeddb-server"
-version = "0.1.0"
+version = "1.0.0-rc1"
 dependencies = [
  "axum",
  "embeddb-core",
@@ -532,7 +533,7 @@ dependencies = [
 
 [[package]]
 name = "embeddb-storage"
-version = "0.1.0"
+version = "1.0.0-rc1"
 dependencies = [
  "bytemuck",
  "crc32fast",

@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 embeddb-core = { path = "../embeddb-core" }
 embeddb-server = { path = "../embeddb-server" }
+embeddb-embedding = { path = "../embeddb-embedding" }
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true

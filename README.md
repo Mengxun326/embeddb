@@ -1,11 +1,11 @@
 # EmbedDB
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.0.0--rc1-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
   <img src="https://img.shields.io/badge/rust-stable%201.80+-orange.svg" alt="Rust">
-  <img src="https://img.shields.io/badge/tests-57%20passed-brightgreen.svg" alt="Tests">
-  <img src="https://img.shields.io/badge/status-Phase%200%20MVP-yellow.svg" alt="Status">
+  <img src="https://img.shields.io/badge/tests-70%20passed-brightgreen.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/status-v1.0.0--rc1-blue.svg" alt="Status">
 </p>
 
 <p align="center">
@@ -59,8 +59,8 @@ EmbedDB is an **embedded vector database** — it runs inside your application p
 - [x] **Web Dashboard** — Built-in management UI (served from binary)
 - [x] **Python SDK** — Native bindings via ctypes over C FFI
 - [x] **JavaScript/TypeScript SDK** — napi-rs native module with type definitions
-- [ ] **ONNX embedding engine** — Built-in text embedding (requires onnxruntime)
-- [ ] **npm/pip publishing** — Publish to package registries
+- [x] **Text embedding** — SimpleEmbedder (hash-based, zero deps) + ONNX interface ready
+- [x] **npm/pip packages** — Package configs ready; publishing on v1.0.0 release
 
 ### Phase 3 (v1.0.0)
 

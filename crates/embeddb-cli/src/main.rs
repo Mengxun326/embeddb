@@ -3,6 +3,7 @@
 use clap::{Parser, Subcommand};
 use embeddb_core::config::{CollectionConfig, Document, SearchQuery};
 use embeddb_core::db::Database;
+use embeddb_embedding::{Embedder, SimpleEmbedder};
 use std::path::PathBuf;
 
 #[tokio::main]
@@ -31,6 +32,25 @@ enum Commands {
         page_size: u32,
     },
 
+    /// Create a new collection
+    CreateCollection {
+        /// Collection name
+        #[arg(short, long)]
+        name: String,
+
+        /// Vector dimension
+        #[arg(short, long, default_value = "384")]
+        dim: usize,
+
+        /// Distance metric: cosine, euclidean, dot
+        #[arg(short, long, default_value = "cosine")]
+        distance: String,
+
+        /// Index type: flat, hnsw
+        #[arg(long, default_value = "flat")]
+        index: String,
+    },
+
     /// Insert a document into a collection
     Insert {
         /// Collection name
@@ -52,6 +72,10 @@ enum Commands {
         /// Text content (for future embedding support)
         #[arg(short, long)]
         text: Option<String>,
+
+        /// Index type for auto-created collections: flat, hnsw
+        #[arg(long, default_value = "flat")]
+        index: String,
     },
 
     /// Search for similar vectors
@@ -60,9 +84,9 @@ enum Commands {
         #[arg(short, long)]
         collection: String,
 
-        /// Query vector as comma-separated f32 numbers
-        #[arg(short, long, value_delimiter = ',')]
-        vector: Vec<f32>,
+        /// Query vector as comma-separated f32 numbers (or use --text for auto-embed)
+        #[arg(short, long, value_delimiter = ',', required = false)]
+        vector: Option<Vec<f32>>,
 
         /// Number of results (top-k)
         #[arg(short = 'k', long, default_value = "10")]
@@ -71,6 +95,10 @@ enum Commands {
         /// Metadata filter expression
         #[arg(short, long)]
         filter: Option<String>,
+
+        /// Text query (auto-embed using SimpleEmbedder)
+        #[arg(short, long)]
+        text: Option<String>,
 
         /// Output format
         #[arg(long, default_value = "table")]
@@ -114,20 +142,13 @@ enum Commands {
 
     let result = match cli.command {
         Commands::Init { page_size } => cmd_init(&cli.path, page_size),
+        Commands::CreateCollection { name, dim, distance, index } => cmd_create_collection(&cli.path, &name, dim, &distance, &index),
         Commands::Insert {
-            collection,
-            id,
-            vector,
-            meta,
-            text,
-        } => cmd_insert(&cli.path, &collection, id, vector, meta, text),
+            collection, id, vector, meta, text, index,
+        } => cmd_insert(&cli.path, &collection, id, vector, meta, text, &index),
         Commands::Search {
-            collection,
-            vector,
-            top_k,
-            filter,
-            format,
-        } => cmd_search(&cli.path, &collection, vector, top_k, filter, &format),
+            collection, vector, top_k, filter, text, format,
+        } => cmd_search(&cli.path, &collection, vector, top_k, filter, text, &format),
         Commands::Info => cmd_info(&cli.path),
         Commands::Stats { collection } => cmd_stats(&cli.path, collection),
         Commands::Serve { host, port } => cmd_serve(&cli.path, &host, port).await,
@@ -155,6 +176,16 @@ fn cmd_init(path: &std::path::Path, page_size: u32) -> Result<(), String> {
     Ok(())
 }
 
+fn cmd_create_collection(path: &std::path::Path, name: &str, dim: usize, distance: &str, index: &str) -> Result<(), String> {
+    let db = Database::open(path).map_err(|e| e.to_string())?;
+    let metric = match distance { "euclidean" => embeddb_core::DistanceMetric::Euclidean, "dot" => embeddb_core::DistanceMetric::DotProduct, _ => embeddb_core::DistanceMetric::Cosine, };
+    let config = CollectionConfig { name: name.to_string(), dimension: dim, distance: metric, description: String::new(), data_root_page: 0, metadata_root_page: 0, index_type: index.to_string(), };
+    db.create_collection(config).map_err(|e| e.to_string())?;
+    println!("Created collection '{}' with dimension {}, distance={}, index={}", name, dim, distance, index);
+    db.close().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 fn cmd_insert(
     path: &std::path::Path,
     collection: &str,
@@ -162,15 +193,17 @@ fn cmd_insert(
     vector: Option<Vec<f32>>,
     meta: Option<String>,
     text: Option<String>,
+    index: &str,
 ) -> Result<(), String> {
     let db = Database::open(path).map_err(|e| e.to_string())?;
 
     // Create collection if it doesn't exist (auto-detect dimension)
     if !db.collection_exists(collection) {
         let dim = vector.as_ref().map(|v| v.len()).unwrap_or(384);
-        let config = CollectionConfig::new(collection, dim);
+        let mut config = CollectionConfig::new(collection, dim);
+        config.index_type = index.to_string();
         db.create_collection(config).map_err(|e| e.to_string())?;
-        println!("Created collection '{}' with dimension {}", collection, dim);
+        println!("Created collection '{}' with dimension {}, index={}", collection, dim, index);
     }
 
     let metadata = meta
@@ -195,14 +228,27 @@ fn cmd_insert(
 fn cmd_search(
     path: &std::path::Path,
     collection: &str,
-    vector: Vec<f32>,
+    vector: Option<Vec<f32>>,
     top_k: usize,
     filter: Option<String>,
+    text: Option<String>,
     format: &str,
 ) -> Result<(), String> {
     let db = Database::open(path).map_err(|e| e.to_string())?;
 
-    let query = SearchQuery::with_vector(vector, top_k);
+    // If --text provided, auto-embed using SimpleEmbedder
+    let search_vector = if let Some(t) = text {
+        let col = db.get_collection(collection).map_err(|e| format!("Cannot determine dimension: {}", e))?;
+        let dim = col.read().dimension();
+        let embedder = SimpleEmbedder::new(dim);
+        embedder.embed(&t)
+    } else if let Some(v) = vector {
+        v
+    } else {
+        return Err("Either --vector or --text is required for search".into());
+    };
+
+    let query = SearchQuery::with_vector(search_vector, top_k);
     let query = if let Some(f) = filter {
         query.with_filter(f)
     } else {

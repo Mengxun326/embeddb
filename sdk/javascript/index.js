@@ -2,72 +2,63 @@
  * EmbedDB JavaScript SDK
  *
  * Embedded vector database for Node.js applications.
- * Wraps the native Rust library via napi-rs bindings.
+ * Uses native napi-rs bindings compiled from Rust.
+ *
+ * Build: cd sdk/javascript && npm run build  (requires @napi-rs/cli)
  *
  * @example
- * const embeddb = require('embeddb');
- * const db = new embeddb.Database('data.embeddb');
- * const col = db.createCollection('docs', { dimension: 384 });
- * col.insert({ id: 'doc1', vector: new Float32Array(384) });
- * const results = col.search({ vector: new Float32Array(384), topK: 10 });
+ * const { Database } = require('embeddb');
+ * const db = new Database('data.embeddb');
+ * db.createCollection('docs', 384, 'cosine');
+ * db.insert('docs', 'doc1', new Float32Array(384), '{"title":"hello"}');
+ * const results = db.search('docs', new Float32Array(384), 10);
+ * db.close();
  */
 
-// Try to load native bindings, fall back to a helpful error
 let native;
 try {
-  native = require('./native');
-} catch (e) {
-  native = null;
+  // napi-rs builds to embeddb_js.{platform}.node
+  native = require('./embeddb_js.win32-x64-msvc.node');
+} catch (e1) {
+  try { native = require('./embeddb_js'); }
+  catch (e2) {
+    native = null;
+  }
 }
 
 class Database {
-  constructor(path, config = {}) {
+  constructor(path) {
     if (!native) {
       throw new Error(
-        'EmbedDB native module not found. ' +
-        'Build it with: cd sdk/javascript && npm run build-native'
+        'EmbedDB native module not found. Build it with:\n' +
+        '  cd sdk/javascript && npm install && npm run build'
       );
     }
-    this._handle = native.open(path, config);
+    this._db = new native.EmbedDb(path);
   }
 
-  createCollection(name, config = {}) {
-    const { dimension = 384, distance = 'cosine' } = config;
-    native.createCollection(this._handle, name, dimension, distance);
-    return new Collection(this._handle, name);
+  createCollection(name, dimension, distance = 'cosine') {
+    this._db.createCollection(name, dimension, distance);
   }
 
-  getCollection(name) {
-    return new Collection(this._handle, name);
+  insert(collection, id, vector, metadata) {
+    return this._db.insert(collection, id || null, Array.from(vector), metadata || null);
+  }
+
+  search(collection, vector, topK = 10, filter = null) {
+    return this._db.search(collection, Array.from(vector), topK, filter);
+  }
+
+  listCollections() {
+    return this._db.listCollections();
   }
 
   close() {
-    if (this._handle) {
-      native.close(this._handle);
-      this._handle = null;
+    if (this._db) {
+      this._db.close();
+      this._db = null;
     }
   }
 }
 
-class Collection {
-  constructor(dbHandle, name) {
-    this._db = dbHandle;
-    this._name = name;
-  }
-
-  get name() {
-    return this._name;
-  }
-
-  insert(doc) {
-    const { id, vector, metadata, text } = doc;
-    return native.insertVector(this._db, this._name, id || null, vector, metadata || null);
-  }
-
-  search(query) {
-    const { vector, topK = 10, filter = null } = query;
-    return native.search(this._db, this._name, vector, topK, filter);
-  }
-}
-
-module.exports = { Database, Collection };
+module.exports = { Database };

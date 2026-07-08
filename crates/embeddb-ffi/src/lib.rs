@@ -303,6 +303,53 @@ pub unsafe extern "C" fn embeddb_free_string(s: *mut c_char) {
     }
 }
 
+/// List all collection names in the database.
+///
+/// Returns a JSON-encoded array of strings, or null on failure.
+/// Caller must free with `embeddb_free_string`.
+///
+/// # Safety
+/// `db` must be a valid pointer.
+#[no_mangle]
+pub unsafe extern "C" fn embeddb_list_collections(db: *mut EmbedDb) -> *mut c_char {
+    if db.is_null() { return ptr::null_mut(); }
+    let db = unsafe { &*db };
+    let names = db.db.list_collections();
+    let json = format!("[{}]", names.iter().map(|n| format!("\"{}\"", n)).collect::<Vec<_>>().join(","));
+    CString::new(json).map(|cs| cs.into_raw()).unwrap_or(ptr::null_mut())
+}
+
+/// Delete a document from a collection.
+///
+/// Returns 0 on success, -1 on failure.
+///
+/// # Safety
+/// `db`, `collection_name`, `doc_id` must be valid null-terminated UTF-8 strings.
+#[no_mangle]
+pub unsafe extern "C" fn embeddb_delete(
+    db: *mut EmbedDb,
+    collection_name: *const c_char,
+    doc_id: *const c_char,
+) -> i32 {
+    if db.is_null() || collection_name.is_null() || doc_id.is_null() { return -1; }
+    let db = unsafe { &*db };
+    let col_name = match unsafe { CStr::from_ptr(collection_name) }.to_str() {
+        Ok(s) => s, Err(_) => return -1,
+    };
+    let id = match unsafe { CStr::from_ptr(doc_id) }.to_str() {
+        Ok(s) => s, Err(_) => return -1,
+    };
+    match db.db.get_collection(col_name) {
+        Ok(col) => {
+            match col.write().delete(id) {
+                Ok(()) => 0,
+                Err(_) => -1,
+            }
+        }
+        Err(_) => -1,
+    }
+}
+
 /// Get a human-readable error message for the last operation on a database.
 ///
 /// Returns a static string.
@@ -311,7 +358,5 @@ pub unsafe extern "C" fn embeddb_free_string(s: *mut c_char) {
 /// `db` must be a valid pointer or null.
 #[no_mangle]
 pub unsafe extern "C" fn embeddb_error(_db: *mut EmbedDb) -> *const c_char {
-    // For simplicity in Phase 0, return a generic message.
-    // Phase 1 will store per-database error state.
     b"An error occurred\0".as_ptr() as *const c_char
 }
