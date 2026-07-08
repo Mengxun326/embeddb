@@ -137,11 +137,11 @@ function showToast(msg, type = 'success') {
   setTimeout(() => t.className = '', 3000);
 }
 
-function switchPage(name) {
+function switchPage(name, event) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
   document.getElementById(name).classList.add('active');
-  event.target.classList.add('active');
+  if (event && event.target) event.target.classList.add('active');
   if (name === 'playground') loadCollections();
   loadOverview();
 }

@@ -261,7 +261,7 @@ impl HnswGraph {
 
     /// Search within a single layer using beam search.
     ///
-    /// Returns up to `ef` nearest candidates sorted by distance.
+    /// Returns up to `ef` nearest candidates sorted by distance (best first).
     fn search_layer(
         &self,
         query: &[f32],
@@ -270,10 +270,9 @@ impl HnswGraph {
         layer: usize,
     ) -> Result<Vec<SearchResult>> {
         use std::collections::BinaryHeap;
-        use std::cmp::Ordering;
+        use std::cmp::{Ordering, Reverse};
 
-        // Min-heap for candidates (we want the closest, so negate score)
-        // BinaryHeap is a max-heap by default
+        // Candidate with NATURAL Ord: larger score = Greater (worst on top in a max-heap).
         #[derive(PartialEq)]
         struct Candidate {
             id: u64,
@@ -282,7 +281,7 @@ impl HnswGraph {
         impl Eq for Candidate {}
         impl PartialOrd for Candidate {
             fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-                other.score.partial_cmp(&self.score)
+                self.score.partial_cmp(&other.score)
             }
         }
         impl Ord for Candidate {
@@ -292,8 +291,10 @@ impl HnswGraph {
         }
 
         let mut visited: HashMap<u64, f32> = HashMap::new();
-        let mut candidates = BinaryHeap::new();
-        let mut results = BinaryHeap::new();
+        // candidates: Reverse<Candidate> → closest (smallest score) on top → correct exploration order
+        let mut candidates: BinaryHeap<Reverse<Candidate>> = BinaryHeap::new();
+        // results: Candidate → farthest (largest score) on top → correct for peek(worst) and pop(worst)
+        let mut results: BinaryHeap<Candidate> = BinaryHeap::new();
 
         // Start from entry point
         let entry = self
@@ -302,13 +303,12 @@ impl HnswGraph {
             .ok_or(IndexError::VectorNotFound(entry_id))?;
         let dist = self.metric.compute(query, &entry.vector);
         visited.insert(entry_id, dist);
-        candidates.push(Candidate { id: entry_id, score: dist });
+        candidates.push(Reverse(Candidate { id: entry_id, score: dist }));
         results.push(Candidate { id: entry_id, score: dist });
 
-        while !candidates.is_empty() {
-            let curr = candidates.pop().unwrap();
-
-            // If worst result is better than current candidate, we're done
+        while let Some(Reverse(curr)) = candidates.pop() {
+            // Early termination: if the current candidate is farther than the WORST kept result,
+            // all remaining candidates will also be farther, so we're done.
             if let Some(worst) = results.peek() {
                 if results.len() >= ef && curr.score > worst.score {
                     break;
@@ -337,7 +337,7 @@ impl HnswGraph {
                         }
                     };
 
-                    // If this neighbor is closer than the worst result, add it
+                    // Add neighbor if it's closer than the WORST result (or we haven't reached ef yet)
                     let should_add = if results.len() < ef {
                         true
                     } else if let Some(worst) = results.peek() {
@@ -347,9 +347,9 @@ impl HnswGraph {
                     };
 
                     if should_add {
-                        candidates.push(Candidate { id: neighbor_id, score: d });
+                        candidates.push(Reverse(Candidate { id: neighbor_id, score: d }));
                         results.push(Candidate { id: neighbor_id, score: d });
-                        // Prune results to ef
+                        // Prune results: remove the WORST (farthest) entry
                         while results.len() > ef {
                             results.pop();
                         }
@@ -358,17 +358,12 @@ impl HnswGraph {
             }
         }
 
-        // Convert to sorted SearchResult vec
-        let mut sorted: Vec<SearchResult> = results
+        // into_sorted_vec gives ascending order (best first) because Candidate Ord is natural
+        let sorted: Vec<SearchResult> = results
             .into_sorted_vec()
             .into_iter()
             .map(|c| SearchResult::new(c.id, c.score))
             .collect();
-        sorted.sort_by(|a, b| {
-            a.score
-                .partial_cmp(&b.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
 
         Ok(sorted)
     }

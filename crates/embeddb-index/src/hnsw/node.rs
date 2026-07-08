@@ -82,8 +82,9 @@ impl HnswNode {
 /// Generate a random layer for a new node using the HNSW level generation algorithm.
 ///
 /// The level is floor(-ln(uniform(0,1)) * mL), clamped to a reasonable maximum.
+/// Clamped to `f64::EPSILON` to prevent ln(0) = -inf panics.
 pub fn random_level(ml: f64, max_level: usize) -> usize {
-    let r: f64 = fastrand::f64();
+    let r: f64 = fastrand::f64().max(f64::EPSILON);
     let level = (-r.ln() * ml).floor() as usize;
     level.min(max_level)
 }

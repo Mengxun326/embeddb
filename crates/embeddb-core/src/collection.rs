@@ -3,10 +3,97 @@
 use crate::config::{CollectionConfig, Document, SearchHit, SearchQuery};
 use crate::error::{Error, Result};
 use embeddb_index::flat::FlatIndex;
-use embeddb_index::{DistanceMetric, VectorIndex};
+use embeddb_index::hnsw::graph::HnswGraph;
+use embeddb_index::hnsw::HnswConfig;
+use embeddb_index::{DistanceMetric, SearchResult, VectorIndex};
 use embeddb_metadata::filter::Filter;
 use embeddb_metadata::store::MetadataStore;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
+
+// ---------------------------------------------------------------------------
+// Index backend — enum dispatching over available index types
+// ---------------------------------------------------------------------------
+
+/// Supported index backends.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum IndexType {
+    /// Exact brute-force search. Best for small datasets (< 10k vectors).
+    Flat,
+    /// Approximate nearest neighbor via HNSW. 10-100x faster at scale.
+    Hnsw,
+}
+
+impl Default for IndexType {
+    fn default() -> Self {
+        IndexType::Flat
+    }
+}
+
+/// Dispatch enum that wraps either a FlatIndex or an HnswGraph.
+pub enum IndexBackend {
+    Flat(FlatIndex),
+    Hnsw(HnswGraph),
+}
+
+impl IndexBackend {
+    /// Create a new index of the given type.
+    pub fn new(dimension: usize, metric: DistanceMetric, index_type: IndexType) -> Self {
+        match index_type {
+            IndexType::Flat => IndexBackend::Flat(FlatIndex::new(dimension, metric)),
+            IndexType::Hnsw => IndexBackend::Hnsw(HnswGraph::new(
+                dimension, metric, HnswConfig::default(),
+            )),
+        }
+    }
+
+    /// Get the vector for a given internal ID (if the index stores it).
+    pub fn get_vector(&self, id: u64) -> Option<Vec<f32>> {
+        match self {
+            IndexBackend::Flat(idx) => idx
+                .find_idx(id)
+                .and_then(|pos| idx.get_by_idx(pos))
+                .map(|(_, v)| v.clone()),
+            IndexBackend::Hnsw(graph) => graph
+                .get_node(id)
+                .map(|n| n.vector.clone()),
+        }
+    }
+}
+
+impl VectorIndex for IndexBackend {
+    fn search(&self, query: &[f32], k: usize) -> std::result::Result<Vec<SearchResult>, embeddb_index::IndexError> {
+        match self {
+            IndexBackend::Flat(idx) => idx.search(query, k),
+            IndexBackend::Hnsw(graph) => graph.search(query, k),
+        }
+    }
+
+    fn insert(&mut self, id: u64, vector: &[f32]) -> std::result::Result<(), embeddb_index::IndexError> {
+        match self {
+            IndexBackend::Flat(idx) => idx.insert(id, vector),
+            IndexBackend::Hnsw(graph) => graph.insert(id, vector),
+        }
+    }
+
+    fn remove(&mut self, id: u64) -> std::result::Result<(), embeddb_index::IndexError> {
+        match self {
+            IndexBackend::Flat(idx) => idx.remove(id),
+            IndexBackend::Hnsw(graph) => graph.remove(id),
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            IndexBackend::Flat(idx) => idx.len(),
+            IndexBackend::Hnsw(graph) => graph.len(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Collection
+// ---------------------------------------------------------------------------
 
 /// Internal ID counter for auto-generating document IDs.
 static NEXT_DOC_ID: AtomicU64 = AtomicU64::new(1);
@@ -19,28 +106,33 @@ fn next_doc_id() -> u64 {
 pub struct Collection {
     /// Collection configuration.
     config: CollectionConfig,
-    /// Vector index (flat for Phase 0, HNSW for Phase 1).
-    index: FlatIndex,
+    /// Vector index (flat or HNSW).
+    index: IndexBackend,
     /// Metadata store.
     metadata: MetadataStore,
     /// Mapping from string document IDs to internal u64 IDs.
-    id_map: std::collections::HashMap<String, u64>,
+    id_map: HashMap<String, u64>,
     /// Reverse mapping from u64 IDs to string document IDs.
-    reverse_id_map: std::collections::HashMap<u64, String>,
+    reverse_id_map: HashMap<u64, String>,
 }
 
 impl Collection {
-    /// Create a new collection.
+    /// Create a new collection with the default index type (Flat).
     pub fn new(config: CollectionConfig) -> Self {
+        Self::with_index(config, IndexType::default())
+    }
+
+    /// Create a new collection with a specific index type.
+    pub fn with_index(config: CollectionConfig, index_type: IndexType) -> Self {
         let dimension = config.dimension;
         let distance = config.distance;
         let name = config.name.clone();
         Self {
             config,
-            index: FlatIndex::new(dimension, distance),
+            index: IndexBackend::new(dimension, distance, index_type),
             metadata: MetadataStore::new(name),
-            id_map: std::collections::HashMap::new(),
-            reverse_id_map: std::collections::HashMap::new(),
+            id_map: HashMap::new(),
+            reverse_id_map: HashMap::new(),
         }
     }
 
@@ -73,7 +165,6 @@ impl Collection {
     ///
     /// If the document has a vector, it will be indexed for search.
     /// If the document has metadata, it will be stored for filtering.
-    /// At least one of vector or text is required.
     pub fn insert(&mut self, doc: Document) -> Result<String> {
         let doc_id = doc
             .id
@@ -135,7 +226,6 @@ impl Collection {
         // Convert to SearchHit, applying metadata filters
         let mut hits = Vec::new();
         for result in raw_results {
-            // Resolve string ID from internal u64 ID
             let doc_id = self
                 .reverse_id_map
                 .get(&result.id)
@@ -146,10 +236,9 @@ impl Collection {
             if let Some(ref filter) = filter {
                 if let Some(entry) = self.metadata.get(&doc_id) {
                     if !filter.evaluate(&entry.data) {
-                        continue; // Filtered out
+                        continue;
                     }
                 } else {
-                    // No metadata — if filter exists, exclude
                     continue;
                 }
             }
@@ -161,7 +250,7 @@ impl Collection {
             };
 
             let vector = if query.include_vectors {
-                self.resolve_vector(result.id)
+                self.index.get_vector(result.id)
             } else {
                 None
             };
@@ -180,12 +269,10 @@ impl Collection {
     /// Delete a document from the collection.
     pub fn delete(&mut self, id: &str) -> Result<()> {
         if let Some(&internal_id) = self.id_map.get(id) {
-            // Ignore index errors for missing vectors
             let _ = self.index.remove(internal_id);
             self.reverse_id_map.remove(&internal_id);
         }
         self.id_map.remove(id);
-        // Ignore metadata errors for missing entries
         let _ = self.metadata.remove(id);
         Ok(())
     }
@@ -199,14 +286,6 @@ impl Collection {
     pub fn list_ids(&self) -> Vec<&str> {
         self.metadata.all_ids()
     }
-
-    // Resolve a vector by internal ID (from the flat index).
-    fn resolve_vector(&self, internal_id: u64) -> Option<Vec<f32>> {
-        self.index
-            .find_idx(internal_id)
-            .and_then(|idx| self.index.get_by_idx(idx))
-            .map(|(_, vec)| vec.clone())
-    }
 }
 
 #[cfg(test)]
@@ -219,21 +298,34 @@ mod tests {
         Collection::new(config)
     }
 
+    fn make_hnsw_collection() -> Collection {
+        let config = CollectionConfig::new("test_hnsw", 3).with_distance(DistanceMetric::Euclidean);
+        Collection::with_index(config, IndexType::Hnsw)
+    }
+
     #[test]
-    fn test_insert_and_search() {
+    fn test_insert_and_search_flat() {
         let mut col = make_collection();
 
-        col.insert(Document::with_vector("a", vec![1.0, 0.0, 0.0]))
-            .unwrap();
-        col.insert(Document::with_vector("b", vec![0.0, 1.0, 0.0]))
-            .unwrap();
-        col.insert(Document::with_vector("c", vec![0.0, 0.0, 1.0]))
-            .unwrap();
+        col.insert(Document::with_vector("a", vec![1.0, 0.0, 0.0])).unwrap();
+        col.insert(Document::with_vector("b", vec![0.0, 1.0, 0.0])).unwrap();
+        col.insert(Document::with_vector("c", vec![0.0, 0.0, 1.0])).unwrap();
 
-        let results = col
-            .search(SearchQuery::with_vector(vec![1.0, 0.0, 0.0], 3))
-            .unwrap();
+        let results = col.search(SearchQuery::with_vector(vec![1.0, 0.0, 0.0], 3)).unwrap();
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].id, "a");
+        assert!((results[0].score - 0.0).abs() < 1e-6);
+    }
 
+    #[test]
+    fn test_insert_and_search_hnsw() {
+        let mut col = make_hnsw_collection();
+
+        col.insert(Document::with_vector("a", vec![1.0, 0.0, 0.0])).unwrap();
+        col.insert(Document::with_vector("b", vec![0.0, 1.0, 0.0])).unwrap();
+        col.insert(Document::with_vector("c", vec![0.0, 0.0, 1.0])).unwrap();
+
+        let results = col.search(SearchQuery::with_vector(vec![1.0, 0.0, 0.0], 3)).unwrap();
         assert_eq!(results.len(), 3);
         assert_eq!(results[0].id, "a");
         assert!((results[0].score - 0.0).abs() < 1e-6);
@@ -244,26 +336,17 @@ mod tests {
         let mut col = make_collection();
 
         col.insert(Document::with_vector_and_metadata(
-            "a",
-            vec![1.0, 0.0, 0.0],
-            json!({"category": "tech", "score": 10}),
-        ))
-        .unwrap();
+            "a", vec![1.0, 0.0, 0.0], json!({"category": "tech", "score": 10}),
+        )).unwrap();
 
         col.insert(Document::with_vector_and_metadata(
-            "b",
-            vec![0.0, 1.0, 0.0],
-            json!({"category": "science", "score": 5}),
-        ))
-        .unwrap();
+            "b", vec![0.0, 1.0, 0.0], json!({"category": "science", "score": 5}),
+        )).unwrap();
 
-        // Search with filter
-        let results = col
-            .search(
-                SearchQuery::with_vector(vec![1.0, 0.0, 0.0], 3)
-                    .with_filter(r#"category = "tech""#),
-            )
-            .unwrap();
+        let results = col.search(
+            SearchQuery::with_vector(vec![1.0, 0.0, 0.0], 3)
+                .with_filter(r#"category = "tech""#),
+        ).unwrap();
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].id, "a");
@@ -273,25 +356,20 @@ mod tests {
     #[test]
     fn test_delete() {
         let mut col = make_collection();
-        col.insert(Document::with_vector("a", vec![1.0, 0.0, 0.0]))
-            .unwrap();
+        col.insert(Document::with_vector("a", vec![1.0, 0.0, 0.0])).unwrap();
         assert_eq!(col.vector_count(), 1);
 
         col.delete("a").unwrap();
         assert_eq!(col.vector_count(), 0);
 
-        let results = col
-            .search(SearchQuery::with_vector(vec![1.0, 0.0, 0.0], 1))
-            .unwrap();
+        let results = col.search(SearchQuery::with_vector(vec![1.0, 0.0, 0.0], 1)).unwrap();
         assert!(results.is_empty());
     }
 
     #[test]
     fn test_dimension_mismatch() {
         let mut col = make_collection();
-        let err = col
-            .insert(Document::with_vector("a", vec![1.0, 0.0])) // 2d instead of 3d
-            .unwrap_err();
+        let err = col.insert(Document::with_vector("a", vec![1.0, 0.0])).unwrap_err();
         assert!(matches!(err, Error::DimensionMismatch { .. }));
     }
 }

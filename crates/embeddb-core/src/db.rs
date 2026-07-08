@@ -10,7 +10,7 @@ use crate::error::{Error, Result};
 use embeddb_storage::format::PageType;
 use embeddb_storage::page_cache::{CacheConfig, PageCache};
 use embeddb_storage::wal::WalManager;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -27,6 +27,8 @@ pub struct Database {
     wal: Arc<WalManager>,
     /// Collections (name → collection).
     collections: RwLock<HashMap<String, Arc<RwLock<Collection>>>>,
+    /// Catalog mutex — prevents TOCTOU races during catalog page allocation.
+    catalog_lock: Mutex<()>,
     /// Database configuration.
     #[allow(dead_code)]
     config: DatabaseConfig,
@@ -73,6 +75,7 @@ impl Database {
             page_cache,
             wal,
             collections: RwLock::new(HashMap::new()),
+            catalog_lock: Mutex::new(()),
             config,
         };
 
@@ -194,7 +197,11 @@ impl Database {
     // ------------------------------------------------------------------
 
     /// Ensure the catalog page exists (allocate if first collection).
+    /// Protected by catalog_lock to prevent TOCTOU race.
     fn ensure_catalog_page(&self) -> Result<u64> {
+        let _guard = self.catalog_lock.lock();
+
+        // Double-check under lock
         let header = self.page_cache.db_header().map_err(Error::Storage)?;
         if header.catalog_root_page != 0 {
             return Ok(header.catalog_root_page);
@@ -225,15 +232,22 @@ impl Database {
             Error::Other(format!("Failed to serialize collection config: {}", e))
         })?;
 
-        // Write as a cell on the catalog page
-        self.page_cache
+        // Write as a cell on the catalog page; check the bool return value
+        let written = self
+            .page_cache
             .write_cell(catalog_page, &json, None)
             .map_err(Error::Storage)?;
+        if !written {
+            return Err(Error::Other("Catalog page full — cannot persist collection".into()));
+        }
 
         self.page_cache.flush_page(catalog_page).map_err(Error::Storage)?;
 
         Ok(())
     }
+
+    // TODO: Page leak — this allocates a new catalog page without freeing the old one.
+    // Phase 3 should add a page free-list or in-place cell deletion to reclaim space.
 
     /// Remove a collection from the catalog by rebuilding the catalog without it.
     fn remove_collection_from_catalog(&self, name: &str) -> Result<()> {
@@ -263,9 +277,13 @@ impl Database {
                 Error::Other(format!("Failed to serialize: {}", e))
             })?;
 
-            self.page_cache
+            let written = self
+                .page_cache
                 .write_cell(new_page, &json, None)
                 .map_err(Error::Storage)?;
+            if !written {
+                return Err(Error::Other("Catalog page full — cannot persist collection".into()));
+            }
         }
 
         // Update DbHeader

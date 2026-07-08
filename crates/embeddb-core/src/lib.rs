@@ -27,7 +27,7 @@ pub mod db;
 pub mod error;
 
 // Re-export main types for convenience
-pub use collection::Collection;
+pub use collection::{Collection, IndexBackend, IndexType};
 pub use config::{
     CollectionConfig, CollectionStats, DatabaseConfig, DatabaseStats, Document, SearchHit,
     SearchQuery,

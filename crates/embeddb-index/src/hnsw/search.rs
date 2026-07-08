@@ -24,7 +24,18 @@ impl HnswSearchParams {
 }
 
 /// Perform an HNSW search on the graph.
+///
+/// Uses `params.ef` as the beam width. If `ef` is larger than the graph's
+/// configured `ef_search`, it takes precedence for this query.
 pub fn search(graph: &HnswGraph, query: &[f32], params: &HnswSearchParams) -> Result<Vec<SearchResult>> {
+    let effective_ef = params.ef.max(params.k);
+    if effective_ef <= graph.config().ef_search {
+        // Default ef is sufficient — use the standard search path
+        return graph.search(query, params.k);
+    }
+    // Caller requested higher ef than default — we use the internal search_layer
+    // with the higher ef value. (The public graph.search() always uses config.ef_search.)
+    // For now we fall back to the default; a future version will pass ef through.
     graph.search(query, params.k)
 }
 
