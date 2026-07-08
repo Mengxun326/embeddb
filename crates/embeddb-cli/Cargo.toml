@@ -1,0 +1,16 @@
+[package]
+name = "embeddb-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "EmbedDB command-line interface"
+
+[[bin]]
+name = "embeddb"
+path = "src/main.rs"
+
+[dependencies]
+embeddb-core = { path = "../embeddb-core" }
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true

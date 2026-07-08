@@ -1,0 +1,13 @@
+[package]
+name = "embeddb-query"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "EmbedDB query planning and hybrid search fusion"
+
+[dependencies]
+embeddb-storage = { path = "../embeddb-storage" }
+embeddb-index = { path = "../embeddb-index" }
+embeddb-metadata = { path = "../embeddb-metadata" }
+serde.workspace = true
+thiserror.workspace = true

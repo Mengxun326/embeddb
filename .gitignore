@@ -1,0 +1,42 @@
+# Rust
+target/
+debug/
+*.rs.bk
+*.pdb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# EmbedDB data files
+*.embeddb
+*.embeddb-wal
+
+# Models (downloaded at runtime)
+models/*.onnx
+
+# Dashboard
+dashboard/node_modules/
+dashboard/dist/
+
+# Python
+sdk/python/__pycache__/
+sdk/python/*.egg-info/
+sdk/python/target/
+
+# JavaScript
+sdk/javascript/node_modules/
+sdk/javascript/dist/
+
+# Go
+sdk/go/vendor/
+
+# Java
+sdk/java/target/
+sdk/java/*.class

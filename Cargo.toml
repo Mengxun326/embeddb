@@ -1,0 +1,65 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/embeddb-core",
+    "crates/embeddb-storage",
+    "crates/embeddb-index",
+    "crates/embeddb-metadata",
+    "crates/embeddb-query",
+    "crates/embeddb-ffi",
+    "crates/embeddb-cli",
+    "crates/embeddb-server",
+    "crates/embeddb-embedding",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/embeddb/embeddb"
+authors = ["EmbedDB Contributors"]
+
+[workspace.dependencies]
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bytemuck = { version = "1", features = ["derive"] }
+
+# Error handling
+thiserror = "2"
+
+# Logging
+log = "0.4"
+tracing = "0.1"
+
+# Concurrency
+parking_lot = "0.12"
+arc-swap = "1"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Storage
+memmap2 = "0.9"
+crc32fast = "1"
+
+# Big arrays / SIMD
+rustix = "0.38"
+
+# Web server (Phase 2)
+# axum = "0.7"
+# tokio = { version = "1", features = ["full"] }
+# tower-http = { version = "0.5", features = ["cors", "fs"] }
+# rust-embed = "8"
+
+# ONNX (Phase 2, feature-gated)
+# ort = "2"
+
+# Text search (Phase 3)
+# tantivy = "0.22"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

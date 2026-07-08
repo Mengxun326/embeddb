@@ -1,0 +1,18 @@
+[package]
+name = "embeddb-index"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "EmbedDB vector indexes: Flat (brute-force), HNSW, IVF"
+
+[dependencies]
+embeddb-storage = { path = "../embeddb-storage" }
+serde.workspace = true
+thiserror.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+bytemuck.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
+rand = "0.8"

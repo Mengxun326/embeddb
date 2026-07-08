@@ -1,0 +1,19 @@
+[package]
+name = "embeddb-embedding"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "EmbedDB ONNX embedding engine (Phase 2, feature-gated)"
+
+[features]
+default = []
+embedding = []  # Will activate ort, tokenizers, hf-hub in Phase 2
+
+[dependencies]
+embeddb-core = { path = "../embeddb-core" }
+serde.workspace = true
+thiserror.workspace = true
+# Will be activated in Phase 2:
+# ort = { version = "2", optional = true }
+# tokenizers = { version = "0.21", optional = true }
+# hf-hub = { version = "0.4", optional = true }
