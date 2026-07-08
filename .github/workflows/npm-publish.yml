@@ -9,13 +9,7 @@ jobs:
   build:
     strategy:
       matrix:
-        include:
-          - os: ubuntu-latest
-            target: linux-x64-gnu
-          - os: macos-latest
-            target: darwin-x64
-          - os: windows-latest
-            target: win32-x64-msvc
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -28,7 +22,7 @@ jobs:
       - run: npm install -g @napi-rs/cli
       - name: Build native module
         working-directory: sdk/javascript
-        run: napi build --platform --release -p vexra-js --target ${{ matrix.target }}
+        run: napi build --platform --release
       - name: Publish (linux only, avoid duplicate)
         if: matrix.os == 'ubuntu-latest'
         working-directory: sdk/javascript
