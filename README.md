@@ -1,36 +1,38 @@
 # EmbedDB
 
 <p align="center">
-  <strong>SQLite for vectors</strong> — an embedded vector database.<br>
-  One binary, one file, zero config. Edge to cloud.
+  <strong>「向量的 SQLite」</strong> — 嵌入式向量数据库。<br>
+  一个二进制、一个文件、零配置。从边缘设备到云端，随处运行。
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/v/tag/Mengxun326/embeddb?label=version&color=blue" alt="Version">
-  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/rust-stable%201.80+-orange" alt="Rust">
-  <img src="https://img.shields.io/badge/tests-70%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/github/v/tag/Mengxun326/embeddb?label=版本&color=blue" alt="版本">
+  <img src="https://img.shields.io/badge/许可证-MIT-green" alt="许可证">
+  <img src="https://img.shields.io/badge/Rust-1.80+-orange" alt="Rust">
+  <img src="https://img.shields.io/badge/测试-70%20通过-brightgreen" alt="测试">
   <img src="https://img.shields.io/github/actions/workflow/status/Mengxun326/embeddb/ci.yml?branch=master" alt="CI">
 </p>
 
 ---
 
-## What is EmbedDB?
+## 这是什么？
 
-EmbedDB runs **inside your process**, stores everything in a **single file**, and requires **zero configuration**. No servers, no YAML files, no Docker containers. It's the database equivalent of SQLite — purpose-built for AI workloads: semantic search, RAG, recommendations, and vector similarity.
+EmbedDB 作为一个**嵌入式数据库**，直接运行在你的应用程序进程内部，所有数据存储在一个**单独的文件**中，**无需任何配置**。不需要服务器、不需要 YAML 配置文件、不需要 Docker 容器。它是 SQLite 在向量检索领域的对应物 —— 专为 AI 工作负载打造：语义搜索、RAG（检索增强生成）、推荐系统，以及任何涉及向量相似度的任务。
 
 ```bash
-# In one terminal
+# 启动 Dashboard
 embeddb serve
 
-# In another
-embeddb insert -c docs -v 0.1,0.2,...,0.384 -m '{"title":"Getting Started"}'
-embeddb search -c docs --text "how to begin" -k 5
+# 插入向量（384维）
+embeddb insert -c docs -v 0.1,0.2,...,0.384 -m '{"title":"入门指南"}'
+
+# 用自然语言搜索
+embeddb search -c docs --text "如何开始" -k 5
 ```
 
-## Quick Start
+## 快速开始
 
-### Install
+### 安装
 
 ```bash
 git clone https://github.com/Mengxun326/embeddb.git
@@ -39,18 +41,18 @@ cargo build --release -p embeddb-cli
 ./target/release/embeddb --help
 ```
 
-### Use
+### 命令行
 
 ```bash
-embeddb init                                    # Create a new database
-embeddb create-collection -n docs -d 3          # Create a 3-dim collection
-embeddb insert -c docs -v 1.0,0.0,0.0          # Insert a vector
-embeddb insert -c docs -v 0.0,1.0,0.0          # Insert another
-embeddb search -c docs -v 1.0,0.1,0.3 -k 2     # Search nearest neighbors
-embeddb serve                                    # Launch web dashboard
+embeddb init                                    # 创建新数据库
+embeddb create-collection -n docs -d 3          # 创建3维集合
+embeddb insert -c docs -v 1.0,0.0,0.0          # 插入向量
+embeddb insert -c docs -v 0.0,1.0,0.0          # 再插一条
+embeddb search -c docs -v 1.0,0.1,0.3 -k 2     # 搜索最近邻
+embeddb serve                                    # 启动 Web 管理面板
 ```
 
-### Library (Rust)
+### Rust 库
 
 ```toml
 [dependencies]
@@ -82,7 +84,7 @@ import embeddb
 
 with embeddb.Database("data.embeddb") as db:
     col = db.create_collection("docs", 384)
-    col.insert({"vector": [0.1] * 384, "metadata": {"title": "Hello"}})
+    col.insert({"vector": [0.1] * 384, "metadata": {"title": "你好"}})
     results = col.search(vector=[0.2] * 384, top_k=5)
     for hit in results:
         print(f"{hit['id']}: {hit['score']:.4f}")
@@ -99,41 +101,41 @@ const results = db.search('docs', new Float32Array(384), 10);
 db.close();
 ```
 
-## Features
+## 功能特性
 
-| Feature | Status | Description |
+| 功能 | 状态 | 说明 |
 |---------|:------:|-------------|
-| **Embedded engine** | ✅ | In-process, single-file, zero-config |
-| **HNSW index** | ✅ | Approximate search, 10-100× faster at scale |
-| **SIMD acceleration** | ✅ | AVX2 (x86_64) + NEON (aarch64) kernels |
-| **Crash safety** | ✅ | Write-Ahead Log with frame checksums |
-| **Collection persistence** | ✅ | Vectors + metadata survive restarts |
-| **Metadata filtering** | ✅ | SQL-like: `category = "tech" AND score > 5.0` |
-| **CLI tool** | ✅ | 8 commands: init, create, insert, search, info, stats, delete, serve |
-| **HTTP API + Dashboard** | ✅ | Axum REST API + built-in management UI |
-| **Python SDK** | ✅ | PyO3 native bindings, `pip install` via maturin |
-| **JavaScript SDK** | ✅ | napi-rs native module, full TypeScript types |
-| **Text embedding** | ✅ | SimpleEmbedder (hash n-grams) + ONNX interface |
-| **BM25 + hybrid search** | ✅ | Tantivy sparse retrieval + RRF fusion |
-| **C FFI** | ✅ | C ABI for Go, Java, Zig, etc. |
-| **Benchmarks** | ✅ | Criterion suite: Flat vs HNSW insert/search/recall |
-| **CI/CD** | ✅ | GitHub Actions: test, lint, release on 3 platforms |
+| **嵌入式引擎** | ✅ | 进程内运行、单文件、零配置 |
+| **HNSW 索引** | ✅ | 近似搜索、大规模下比暴力搜索快 10-100 倍 |
+| **SIMD 加速** | ✅ | AVX2 (x86_64) + NEON (aarch64) 向量化距离计算 |
+| **崩溃安全** | ✅ | WAL 预写日志 + 帧校验和 |
+| **集合持久化** | ✅ | 向量和元数据在进程重启后不丢失 |
+| **元数据过滤** | ✅ | SQL 风格过滤：`category = "tech" AND score > 5.0` |
+| **命令行工具** | ✅ | 8 个命令：init, create-collection, insert, search, info, stats, delete, serve |
+| **HTTP API + Dashboard** | ✅ | Axum REST API + 内嵌 Web 管理界面 |
+| **Python SDK** | ✅ | PyO3 原生绑定、`pip install` 通过 maturin |
+| **JavaScript SDK** | ✅ | napi-rs 原生模块、完整的 TypeScript 类型 |
+| **文本向量化** | ✅ | SimpleEmbedder（哈希 n-gram）+ ONNX 接口预留 |
+| **BM25 + 混合搜索** | ✅ | Tantivy 稀疏检索 + RRF 融合排序 |
+| **C FFI** | ✅ | C ABI 接口，支持 Go、Java、Zig 等语言 |
+| **基准测试** | ✅ | Criterion 套件：Flat vs HNSW 插入/搜索/召回率 |
+| **CI/CD** | ✅ | GitHub Actions：三大平台测试、检查、发布 |
 
-## Why EmbedDB?
+## 竞品对比
 
 | | EmbedDB | Chroma | LanceDB | Qdrant | Milvus |
 |---|:---:|:---:|:---:|:---:|:---:|
-| **Serverless** | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **Single file** | ✅ | ❌ | ✅ | ❌ | ❌ |
-| **Built-in embedding** | ✅ | ✅ | ❌ | ❌ | ❌ |
-| **CLI** | ✅ | ❌ | ❌ | ✅ | ✅ |
-| **Web Dashboard** | ✅ | ❌ | ❌ | ✅ | ✅ |
+| **无服务器** | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **单文件** | ✅ | ❌ | ✅ | ❌ | ❌ |
+| **内置向量化** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **命令行工具** | ✅ | ❌ | ❌ | ✅ | ✅ |
+| **Web 管理面板** | ✅ | ❌ | ❌ | ✅ | ✅ |
 | **SIMD** | ✅ | ❌ | ✅ | ✅ | ✅ |
-| **WAL crash safety** | ✅ | ❌ | ✅ | ✅ | ✅ |
-| **Multi-language SDK** | 🐍⬡🟨 | 🐍 | 🐍⬡🟨 | 🐍⬡🟨 | 🐍⬡🟨 |
-| **Hybrid search** | ✅ | ❌ | ✅ | ✅ | ✅ |
+| **WAL 崩溃安全** | ✅ | ❌ | ✅ | ✅ | ✅ |
+| **多语言 SDK** | 🐍⬡🟨 | 🐍 | 🐍⬡🟨 | 🐍⬡🟨 | 🐍⬡🟨 |
+| **混合搜索** | ✅ | ❌ | ✅ | ✅ | ✅ |
 
-## Architecture
+## 架构
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -145,71 +147,71 @@ db.close();
 │             Database · Collection · Config             │
 ├──────────┬──────────┬──────────┬─────────────────────┤
 │ storage  │  index   │ metadata │  query               │
-│ page fmt │  HNSW    │  store   │  parser              │
-│ WAL      │  Flat    │  filter  │  BM25 (Tantivy)       │
-│ cache    │  SIMD    │ inverted │  RRF fusion          │
+│ 页式存储  │  HNSW    │  元数据   │  查询解析             │
+│ WAL      │  Flat    │  过滤器   │  BM25 (Tantivy)       │
+│ 页缓存    │  SIMD    │  倒排索引  │  RRF 融合           │
 ├──────────┴──────────┴──────────┴─────────────────────┤
 │                embeddb-embedding                      │
-│         SimpleEmbedder · ONNX interface               │
+│         SimpleEmbedder · ONNX 接口预留                │
 ├──────────────────────────────────────────────────────┤
 │                  embeddb-ffi                          │
-│              C ABI for Python / JS / Go / Java        │
+│              C ABI → Python / JS / Go / Java          │
 ├──────────────────────────────────────────────────────┤
 │      Python (PyO3) · JavaScript (napi-rs)             │
-│      Go (CGO) · Java (JNI) [coming]                  │
+│      Go (CGO) · Java (JNI) [即将推出]                  │
 └──────────────────────────────────────────────────────┘
 ```
 
-## Performance
+## 性能
 
-Benchmarks on Intel i7-13700H, AVX2 enabled, 128-dim vectors. Full suite: `cargo bench -p embeddb-core`.
+在 Intel i7-13700H、AVX2 开启、128 维向量的环境下测试。完整基准：`cargo bench -p embeddb-core`。
 
-| Operation | 1K vectors | 10K vectors | 50K vectors |
+| 操作 | 1K 向量 | 10K 向量 | 50K 向量 |
 |-----------|-----------|------------|------------|
-| **Flat insert** | ~0.3ms/vec | ~0.3ms/vec | ~0.3ms/vec |
-| **HNSW insert** | ~1.2ms/vec | ~1.5ms/vec | ~1.8ms/vec |
-| **Flat search (P50)** | ~0.05ms | ~0.4ms | ~2.0ms |
-| **HNSW search (P50)** | ~0.02ms | ~0.04ms | ~0.08ms |
-| **HNSW recall@10** | 99.8% | 99.2% | 98.5% |
+| **Flat 插入** | ~0.3ms/条 | ~0.3ms/条 | ~0.3ms/条 |
+| **HNSW 插入** | ~1.2ms/条 | ~1.5ms/条 | ~1.8ms/条 |
+| **Flat 搜索 (P50)** | ~0.05ms | ~0.4ms | ~2.0ms |
+| **HNSW 搜索 (P50)** | ~0.02ms | ~0.04ms | ~0.08ms |
+| **HNSW 召回率@10** | 99.8% | 99.2% | 98.5% |
 
-> HNSW is 25× faster than brute-force at 50K vectors while maintaining >98% recall.
+> 在 5 万向量规模下，HNSW 比暴力搜索快 25 倍，同时保持 >98% 的召回率。
 
-## Project Structure
+## 项目结构
 
 ```
 embeddb/
 ├── crates/
-│   ├── embeddb-core/        Database, Collection public API
-│   ├── embeddb-storage/     Page format, WAL, page cache
-│   ├── embeddb-index/       HNSW, Flat, SIMD distance
-│   ├── embeddb-metadata/    JSON metadata, filter engine
-│   ├── embeddb-query/       BM25, RRF fusion
-│   ├── embeddb-embedding/   Text embedding engine
-│   ├── embeddb-ffi/         C ABI for language bindings
-│   ├── embeddb-cli/         CLI binary
-│   └── embeddb-server/      HTTP API + Dashboard
+│   ├── embeddb-core/        数据库、集合公共 API
+│   ├── embeddb-storage/     页格式、WAL、页缓存
+│   ├── embeddb-index/       HNSW、Flat、SIMD 距离计算
+│   ├── embeddb-metadata/    JSON 元数据、过滤器引擎
+│   ├── embeddb-query/       BM25、RRF 融合
+│   ├── embeddb-embedding/   文本向量化引擎
+│   ├── embeddb-ffi/         C ABI 多语言绑定基础
+│   ├── embeddb-cli/         命令行工具
+│   └── embeddb-server/       HTTP API + Dashboard
 ├── sdk/
-│   ├── python/              PyO3 native bindings
-│   └── javascript/          napi-rs native module
-├── benches/                 Criterion benchmarks
-├── .github/                 Issue/PR templates, CI/CD
-└── docs/                    Documentation
+│   ├── python/              PyO3 原生 Python 绑定
+│   └── javascript/          napi-rs 原生 Node.js 模块
+├── benches/                 Criterion 性能基准
+├── .github/                 Issue/PR 模板、CI/CD
+└── docs/                    文档
 ```
 
-## Community
+## 社区
 
 - **Issues**: [github.com/Mengxun326/embeddb/issues](https://github.com/Mengxun326/embeddb/issues)
 - **Discussions**: [github.com/Mengxun326/embeddb/discussions](https://github.com/Mengxun326/embeddb/discussions)
-- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md)
-- **Changelog**: [CHANGELOG.md](CHANGELOG.md)
-- **Security**: [SECURITY.md](SECURITY.md)
+- **贡献指南**: [CONTRIBUTING.md](CONTRIBUTING.md)
+- **变更日志**: [CHANGELOG.md](CHANGELOG.md)
+- **安全政策**: [SECURITY.md](SECURITY.md)
 
-## License
+## 许可证
 
-MIT © EmbedDB Contributors.
+MIT © EmbedDB 贡献者。
 
 ---
 
 <p align="center">
-  <sub>Built with Rust 🦀 · Inspired by SQLite's elegant simplicity · AI-native by design</sub>
+  <sub>用 Rust 🦀 构建 · 受 SQLite 优雅简约启发 · AI 原生设计</sub>
 </p>
