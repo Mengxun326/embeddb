@@ -1,20 +1,10 @@
-//! EmbedDB Python SDK — native PyO3 bindings.
-//!
-//! Provides safe, idiomatic Python access to the EmbedDB embedded vector database.
-//! The Database is opened once and shared across all Collection handles via Arc.
-
-use vexra_core::collection::IndexType;
 use vexra_core::config::{CollectionConfig as CoreCollectionConfig, Document, SearchQuery};
-use vexra_core::db::Database;
 use vexra_core::DistanceMetric;
+use vexra_core::db::Database;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyList};
 use std::sync::Arc;
-
-// ---------------------------------------------------------------------------
-// Python-facing classes
-// ---------------------------------------------------------------------------
 
 #[pyclass]
 struct EmbedDB {
@@ -30,52 +20,37 @@ impl EmbedDB {
         Ok(Self { db: Arc::new(db), path: path.to_string() })
     }
 
-    fn create_collection(&self, name: &str, dimension: usize, distance: Option<&str>) -> PyResult<PyCollection> {
+    fn create_collection(&self, name: &str, dim: usize, distance: Option<&str>) -> PyResult<PyCollection> {
         let metric = match distance.unwrap_or("cosine") {
-            "euclidean" => DistanceMetric::Euclidean,
-            "dot" => DistanceMetric::DotProduct,
-            _ => DistanceMetric::Cosine,
+            "euclidean" => DistanceMetric::Euclidean, "dot" => DistanceMetric::DotProduct, _ => DistanceMetric::Cosine,
         };
-        let config = CoreCollectionConfig::new(name, dimension).with_distance(metric);
-        self.db.create_collection(config).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-        Ok(PyCollection { db: self.db.clone(), name: name.to_string(), dimension, distance: metric })
+        self.db.create_collection(CoreCollectionConfig::new(name, dim).with_distance(metric))
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Ok(PyCollection { db: self.db.clone(), name: name.to_string(), dim, distance: metric })
     }
 
     fn get_collection(&self, name: &str) -> PyResult<PyCollection> {
         let col = self.db.get_collection(name).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-        let col = col.read();
-        Ok(PyCollection { db: self.db.clone(), name: col.name().to_string(), dimension: col.dimension(), distance: col.distance_metric() })
+        let c = col.read();
+        let r = PyCollection { db: self.db.clone(), name: c.name().to_string(), dim: c.dimension(), distance: c.distance_metric() };
+        Ok(r)
     }
 
     fn list_collections(&self) -> PyResult<Vec<String>> {
         self.db.list_collections().map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
 
-    fn stats(&self) -> PyResult<String> {
-        let stats = self.db.stats().map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-        serde_json::to_string(&stats).map_err(|e| PyRuntimeError::new_err(e.to_string()))
-    }
-
-    fn drop_collection(&self, name: &str) -> PyResult<()> {
-        self.db.drop_collection(name).map_err(|e| PyRuntimeError::new_err(e.to_string()))
-    }
-
-    fn close(&self) -> PyResult<()> {
-        self.db.close().map_err(|e| PyRuntimeError::new_err(e.to_string()))
-    }
-
+    fn close(&self) -> PyResult<()> { self.db.close().map_err(|e| PyRuntimeError::new_err(e.to_string())) }
     fn __enter__(slf: Py<Self>) -> Py<Self> { slf }
-    fn __exit__(&self, _: PyObject, _: PyObject, _: PyObject) { let _ = self.close(); }
+    fn __exit__(&self, _: PyObject, _: PyObject, _: PyObject) {}
 }
-
-// ---------------------------------------------------------------------------
 
 #[pyclass]
 #[derive(Clone)]
 struct PyCollection {
     db: Arc<Database>,
     name: String,
-    dimension: usize,
+    dim: usize,
     distance: DistanceMetric,
 }
 
@@ -84,47 +59,23 @@ impl PyCollection {
     #[getter]
     fn name(&self) -> &str { &self.name }
     #[getter]
-    fn dimension(&self) -> usize { self.dimension }
+    fn dimension(&self) -> usize { self.dim }
 
-    fn insert(&self, doc: &Bound<'_, PyDict>) -> PyResult<String> {
-        let vector: Vec<f32> = doc.get_item("vector")
-            .ok_or_else(|| PyRuntimeError::new_err("Missing 'vector' field"))?
-            .ok_or_else(|| PyRuntimeError::new_err("'vector' is None"))?
-            .extract()?;
-        let id: Option<String> = doc.get_item("id").ok().flatten().map(|v| v.extract()).transpose()?;
-        let metadata: Option<serde_json::Value> = doc.get_item("metadata").ok().flatten().map(|v| {
-            if let Ok(dict) = v.downcast::<PyDict>() {
-                // Convert Python dict to JSON Value
-                let json_str = dict.repr().map_err(|_| PyRuntimeError::new_err("Cannot convert dict"))?.to_string();
-                serde_json::from_str(&json_str.replace('\'', "\"")).unwrap_or_default()
-            } else {
-                let s: String = v.extract().unwrap_or_default();
-                serde_json::from_str(&s).unwrap_or(serde_json::Value::String(s))
-            }
-        });
-        let text: Option<String> = doc.get_item("text").ok().flatten().map(|v| v.extract()).transpose()?;
-
-        let core_doc = Document { id, vector: Some(vector), metadata, text };
-        vexra_core::insert(&self.db, &self.name, core_doc)
+    fn insert(&self, vector: Vec<f32>, id: Option<String>) -> PyResult<String> {
+        let doc = Document { id, vector: Some(vector), metadata: None, text: None };
+        vexra_core::insert(&self.db, &self.name, doc)
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
 
-    fn search(&self, vector: Vec<f32>, top_k: Option<usize>, filter: Option<&str>) -> PyResult<Vec<PyDict>> {
-        let mut query = SearchQuery::with_vector(vector, top_k.unwrap_or(10));
-        if let Some(f) = filter { query = query.with_filter(f); }
-        let hits = vexra_core::search(&self.db, &self.name, query)
+    fn search(&self, vector: Vec<f32>, top_k: Option<usize>) -> PyResult<Vec<PyObject>> {
+        let hits = vexra_core::search(&self.db, &self.name, SearchQuery::with_vector(vector, top_k.unwrap_or(10)))
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         Python::with_gil(|py| {
-            let results: Vec<PyDict> = hits.iter().map(|h| {
+            let results: Vec<PyObject> = hits.iter().map(|h| {
                 let d = PyDict::new_bound(py);
                 d.set_item("id", &h.id).unwrap();
                 d.set_item("score", h.score).unwrap();
-                if let Some(ref m) = h.metadata { d.set_item("metadata", serde_json::to_string(m).unwrap_or_default()).unwrap(); }
-                if let Some(ref v) = h.vector {
-                    let list = PyList::new_bound(py, v.iter().map(|x| *x));
-                    d.set_item("vector", list).unwrap();
-                }
-                d
+                d.into()
             }).collect();
             Ok(results)
         })
@@ -137,17 +88,14 @@ impl PyCollection {
 
     fn __len__(&self) -> PyResult<usize> {
         let col = self.db.get_collection(&self.name).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-        let count = col.read().vector_count();
-        drop(col);
-        Ok(count)
+        let c = col.read();
+        let n = c.vector_count();
+        drop(c);
+        Ok(n)
     }
 
-    fn __repr__(&self) -> String { format!("Collection(name='{}', dim={})", self.name, self.dimension) }
+    fn __repr__(&self) -> String { format!("Collection(name='{}', dim={})", self.name, self.dim) }
 }
-
-// ---------------------------------------------------------------------------
-// Module
-// ---------------------------------------------------------------------------
 
 #[pymodule]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
