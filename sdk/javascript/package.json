@@ -1,6 +1,6 @@
 {
   "name": "@mengxun326/vexra",
-  "version": "1.0.0-rc1",
+  "version": "1.2.0",
   "description": "Vexra JavaScript SDK — embedded vector database",
   "main": "index.js",
   "types": "index.d.ts",
