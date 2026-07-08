@@ -87,10 +87,9 @@ impl PyCollection {
     }
 
     fn __len__(&self) -> PyResult<usize> {
-        let col = self.db.get_collection(&self.name).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-        let guard = col.read();
-        let n = guard.vector_count();
-        Ok(n)
+        let col_arc = self.db.get_collection(&self.name).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let count = { let g = col_arc.read(); g.vector_count() };
+        Ok(count)
     }
 
     fn __repr__(&self) -> String { format!("Collection(name='{}', dim={})", self.name, self.dim) }
