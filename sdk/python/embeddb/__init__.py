@@ -16,5 +16,5 @@ from embeddb._native import EmbedDB as Database, PyCollection
 # For backward compatibility: expose Collection as an alias
 Collection = PyCollection
 
-__version__ = "1.0.0-beta"
+__version__ = "1.1.0"
 __all__ = ["Database", "Collection", "PyCollection"]

@@ -1,6 +1,6 @@
 [package]
 name = "embeddb-py"
-version = "1.0.0-beta"
+version = "1.1.0"
 edition = "2021"
 license = "MIT"
 description = "EmbedDB Python SDK — embedded vector database"
