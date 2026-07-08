@@ -32,4 +32,4 @@ Issues = "https://github.com/Mengxun326/embeddb/issues"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
-python-source = "."
+module-name = "vexra._native"
