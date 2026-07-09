@@ -3024,9 +3024,9 @@ name = "vexra-embedding"
 version = "1.0.0-rc1"
 dependencies = [
  "hf-hub",
+ "log",
  "ort",
  "serde",
- "thiserror 2.0.18",
  "tokenizers",
  "vexra-core",
 ]

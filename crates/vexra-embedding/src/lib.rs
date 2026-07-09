@@ -1,4 +1,4 @@
-//! EmbedDB Embedding Engine
+//! Vexra Embedding Engine
 //!
 //! Provides text-to-vector embedding for automatic vector generation.
 //! Two backends are available:
@@ -22,6 +22,8 @@ pub mod simple;
 pub mod onnx;
 
 pub use simple::SimpleEmbedder;
+#[cfg(feature = "onnx")]
+pub use onnx::OnnxEmbedder;
 
 /// Trait for text embedding backends.
 pub trait Embedder: Send + Sync {

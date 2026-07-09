@@ -3,7 +3,7 @@
 use clap::{Parser, Subcommand};
 use vexra_core::config::{CollectionConfig, Document, SearchQuery};
 use vexra_core::db::Database;
-use vexra_embedding::{Embedder, SimpleEmbedder};
+use vexra_embedding::create_embedder;
 use std::path::PathBuf;
 
 #[tokio::main]
@@ -252,11 +252,11 @@ fn cmd_search(
 ) -> Result<(), String> {
     let db = Database::open(path).map_err(|e| e.to_string())?;
 
-    // If --text provided, auto-embed using SimpleEmbedder
+    // If --text provided, auto-embed using the best available embedder
     let search_vector = if let Some(t) = text {
         let col = db.get_collection(collection).map_err(|e| format!("Cannot determine dimension: {}", e))?;
         let dim = col.read().dimension();
-        let embedder = SimpleEmbedder::new(dim);
+        let embedder = create_embedder(dim);
         embedder.embed(&t)
     } else if let Some(v) = vector {
         v
