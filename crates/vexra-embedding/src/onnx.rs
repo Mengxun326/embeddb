@@ -16,9 +16,8 @@
 
 use crate::Embedder;
 use hf_hub::api::sync::Api;
-use ort::session::{Session, SessionOutputs};
-use ort::value::Tensor;
-use tokenizers::tokenizer::{Result as TokenizerResult, Tokenizer};
+use ort::session::Session;
+use tokenizers::Tokenizer;
 
 /// Default model: all-MiniLM-L6-v2 (384 dimensions, ~80MB, good for English).
 const DEFAULT_MODEL: &str = "sentence-transformers/all-MiniLM-L6-v2";
@@ -39,6 +38,9 @@ impl OnnxEmbedder {
     /// The `dimension` parameter selects:
     /// - 384 → all-MiniLM-L6-v2 (default, small, fast)
     /// - 768 → all-mpnet-base-v2 (larger, higher quality)
+    ///
+    /// Note: the returned embedder's `dimension()` reflects the **actual model output**,
+    /// which may differ from the requested dimension if the parameter was unsupported.
     pub fn new(dimension: usize) -> Result<Self, Box<dyn std::error::Error>> {
         let model_id = match dimension {
             384 => DEFAULT_MODEL,
@@ -55,15 +57,19 @@ impl OnnxEmbedder {
         let tokenizer_path = api.model(model_id.to_string()).get("tokenizer.json")?;
         let tokenizer = Tokenizer::from_file(tokenizer_path).map_err(|e| format!("Tokenizer: {}", e))?;
 
-        // Load ONNX session
+        // Load ONNX session and discover actual output dimension
         let session = Session::builder()?
             .with_optimization_level(ort::session::builder::OptimizationLevel::Basic)?
             .commit_from_file(model_path)?;
 
-        Ok(Self { session, tokenizer, dimension })
+        // Extract actual output dimension from the model metadata
+        let actual_dim = Self::infer_dimension(&session)?;
+
+        Ok(Self { session, tokenizer, dimension: actual_dim })
     }
 
     /// Create from a local model path (skip download).
+    /// The caller is responsible for ensuring `dimension` matches the model.
     pub fn from_local(
         model_path: &str,
         tokenizer_path: &str,
@@ -76,35 +82,53 @@ impl OnnxEmbedder {
         Ok(Self { session, tokenizer, dimension })
     }
 
-    /// Mean-pool the token embeddings, taking the attention mask into account.
-    fn mean_pool(output: &SessionOutputs, attention_mask: &[i64]) -> Vec<f32> {
-        let embeddings = output["token_embeddings"]
-            .try_extract_tensor::<f32>()
-            .expect("token_embeddings tensor");
+    /// Try to infer the output dimension from the ONNX model.
+    fn infer_dimension(session: &Session) -> Result<usize, Box<dyn std::error::Error>> {
+        for output in &session.outputs {
+            if output.name.contains("embed") || output.name.contains("pool") || output.name.contains("last_hidden") {
+                if let Some(dim) = output.output_type.tensor_type() {
+                    if dim.len() >= 2 {
+                        return Ok(dim[dim.len() - 1] as usize);
+                    }
+                }
+            }
+        }
+        // Fallback: try any output with a known hidden_size
+        for output in &session.outputs {
+            if let Some(dim) = output.output_type.tensor_type() {
+                if dim.len() >= 2 {
+                    return Ok(dim[dim.len() - 1] as usize);
+                }
+            }
+        }
+        Err("Cannot infer dimension from ONNX model outputs".into())
+    }
 
+    /// Mean-pool token embeddings, taking the attention mask into account.
+    fn mean_pool(embeddings: &ort::value::Tensor<f32>, attention_mask: &[i64]) -> Vec<f32> {
         let shape = embeddings.shape();
-        let (batch_size, seq_len, hidden_size) = (shape[0], shape[1], shape[2]);
-        let data = embeddings.view().to_vec();
+        assert!(shape.len() >= 3, "token_embeddings tensor must have 3+ dimensions");
+        let seq_len = shape[1];
+        let hidden_size = shape[2];
+        let view = embeddings.view();
+        let data: Vec<f32> = view.iter().copied().collect();
         let mut result = vec![0.0f32; hidden_size];
 
         for i in 0..seq_len {
             let mask = attention_mask.get(i).copied().unwrap_or(1) as f32;
+            let offset = i * hidden_size;
             for j in 0..hidden_size {
-                result[j] += data[i * hidden_size + j] * mask;
+                result[j] += data[offset + j] * mask;
             }
         }
         let mask_sum: f32 = attention_mask.iter().map(|&m| m as f32).sum();
         if mask_sum > 0.0 {
-            for v in &mut result {
-                *v /= mask_sum;
-            }
+            for v in &mut result { *v /= mask_sum; }
         }
         // L2 normalize
         let norm: f32 = result.iter().map(|v| v * v).sum::<f32>().sqrt();
         if norm > 0.0 {
-            for v in &mut result {
-                *v /= norm;
-            }
+            for v in &mut result { *v /= norm; }
         }
         result
     }
@@ -116,11 +140,10 @@ impl Embedder for OnnxEmbedder {
     }
 
     fn embed(&self, text: &str) -> Vec<f32> {
-        let dim = self.dimension;
-        self.try_embed(text).unwrap_or_else(|e| {
-            log::warn!("ONNX embedding failed: {}, falling back to zero vector", e);
-            vec![0.0; dim]
-        })
+        match self.try_embed(text) {
+            Ok(v) => v,
+            Err(e) => panic!("ONNX embedding failed: {}", e),
+        }
     }
 }
 
@@ -131,9 +154,9 @@ impl OnnxEmbedder {
         let attention_mask: Vec<i64> = encoding.get_attention_mask().iter().map(|&m| m as i64).collect();
         let seq_len = token_ids.len().min(MAX_LENGTH);
 
-        let input_ids = Tensor::from_array(([1i64], [seq_len]), &token_ids[..seq_len])?;
-        let attn = Tensor::from_array(([1i64], [seq_len]), &attention_mask[..seq_len])?;
-        let token_type = Tensor::from_array(([1i64], [seq_len]), &vec![0i64; seq_len])?;
+        let input_ids = ort::value::Tensor::from_array(([1i64], [seq_len]), &token_ids[..seq_len])?;
+        let attn = ort::value::Tensor::from_array(([1i64], [seq_len]), &attention_mask[..seq_len])?;
+        let token_type = ort::value::Tensor::from_array(([1i64], [seq_len]), &vec![0i64; seq_len])?;
 
         let outputs = self.session.run(ort::inputs![
             "input_ids" => input_ids,
@@ -141,7 +164,17 @@ impl OnnxEmbedder {
             "token_type_ids" => token_type,
         ]?)?;
 
-        Ok(Self::mean_pool(&outputs, &attention_mask[..seq_len]))
+        // Find the embedding tensor by trying known output names
+        let embeddings = outputs.iter()
+            .find(|(k, _)| k.contains("embed") || k.contains("hidden") || k.contains("pool"))
+            .or_else(|| outputs.iter().next())
+            .map(|(_, v)| v)
+            .ok_or("No output tensor found")?;
+
+        let tensor = embeddings.try_extract_tensor::<f32>()
+            .map_err(|e| format!("Failed to extract f32 tensor: {}", e))?;
+
+        Ok(Self::mean_pool(&tensor, &attention_mask[..seq_len]))
     }
 }
 

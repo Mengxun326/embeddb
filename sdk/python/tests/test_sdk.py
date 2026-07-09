@@ -15,7 +15,8 @@ def db():
     path = tmp.name
     db = vexra.Database(path)
     yield db
-    db.close()
+    try: db.close()
+    except Exception: pass
     try: os.unlink(path)
     except OSError: pass
 
@@ -112,18 +113,27 @@ def test_many_inserts(db):
     assert len(results) == 5
 
 
-def test_close_reopen(db):
+def test_close_reopen():
     """Insert, close DB, reopen, verify data persists."""
-    path = db._db_path if hasattr(db, '_db_path') else None
-    col = db.create_collection("persist", 3)
+    import tempfile, os
+    tmp = tempfile.NamedTemporaryFile(suffix=".vexra", delete=False)
+    tmp.close()
+    path = tmp.name
+
+    # Session 1: insert data
+    db1 = vexra.Database(path)
+    col = db1.create_collection("persist", 3)
     col.insert([1.0, 0.0, 0.0], id="keep")
     col.insert([0.0, 1.0, 0.0], id="also")
-    db.close()
+    db1.close()
 
-    # Reopen
-    db2 = vexra.Database(path) if path else db
+    # Session 2: verify data survived
+    db2 = vexra.Database(path)
     col2 = db2.get_collection("persist")
     assert len(col2) == 2
     results = col2.search([1.0, 0.0, 0.0], top_k=2)
     assert results[0]["id"] == "keep"
-    if path: db2.close()
+    db2.close()
+
+    try: os.unlink(path)
+    except OSError: pass
