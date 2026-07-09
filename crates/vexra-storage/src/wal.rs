@@ -63,8 +63,8 @@ pub struct WalManager {
     file: Mutex<Option<File>>,
     page_size: u32,
     sequence: Mutex<u64>,
-    salt1: u32,
-    salt2: u32,
+    salt1: std::sync::atomic::AtomicU32,
+    salt2: std::sync::atomic::AtomicU32,
     /// Frames written since last checkpoint.
     frame_count: Mutex<u64>,
     /// Auto-checkpoint threshold (frames).
@@ -76,9 +76,8 @@ impl WalManager {
     pub fn new(db_path: impl AsRef<Path>, page_size: u32) -> Self {
         let wal_path = wal_path_from_db(db_path.as_ref());
 
-        // Generate random salts
-        let salt1 = fastrand::u32(..);
-        let salt2 = fastrand::u32(..);
+        let salt1 = std::sync::atomic::AtomicU32::new(fastrand::u32(..));
+        let salt2 = std::sync::atomic::AtomicU32::new(fastrand::u32(..));
 
         Self {
             path: wal_path,
@@ -141,18 +140,14 @@ impl WalManager {
         // db_size_after (8 bytes)
         frame_header[4..12].copy_from_slice(&db_size_after.to_le_bytes());
         // salt1 (4 bytes)
-        frame_header[12..16].copy_from_slice(&self.salt1.to_le_bytes());
+        frame_header[12..16].copy_from_slice(&self.salt1.load(std::sync::atomic::Ordering::Relaxed).to_le_bytes());
         // salt2 (4 bytes)
-        frame_header[16..20].copy_from_slice(&self.salt2.to_le_bytes());
+        frame_header[16..20].copy_from_slice(&self.salt2.load(std::sync::atomic::Ordering::Relaxed).to_le_bytes());
 
         // Compute checksums
-        let (checksum1, checksum2) = Self::compute_frame_checksum(
-            page_number,
-            &page_data,
-            self.salt1,
-            self.salt2,
-            frame_seq as u32,
-        );
+        let s1 = self.salt1.load(std::sync::atomic::Ordering::Relaxed);
+        let s2 = self.salt2.load(std::sync::atomic::Ordering::Relaxed);
+        let (checksum1, checksum2) = Self::compute_frame_checksum(page_number, &page_data, s1, s2, 0);
 
         frame_header[20..24].copy_from_slice(&checksum1.to_le_bytes());
         frame_header[24..28].copy_from_slice(&checksum2.to_le_bytes());
@@ -223,17 +218,25 @@ impl WalManager {
         let mut wal_file = OpenOptions::new().read(true).write(true).open(&self.path)?;
 
         if wal_file.metadata()?.len() <= WAL_HEADER_SIZE as u64 {
-            // Empty WAL, nothing to recover
             return Ok(0);
         }
 
-        // Validate WAL header
-        if self.validate_wal_header(&mut wal_file).is_err() {
-            // Corrupted WAL header, delete and start fresh
-            drop(wal_file);
-            std::fs::remove_file(&self.path)?;
-            return Ok(0);
-        }
+        // Read and validate WAL header to extract the original salts
+        let (header_salt1, header_salt2) = match self.read_wal_header(&mut wal_file) {
+            Ok((s1, s2)) => {
+                if s1 == 0 && s2 == 0 { return Ok(0); }
+                (s1, s2)
+            }
+            Err(_) => {
+                drop(wal_file);
+                std::fs::remove_file(&self.path)?;
+                return Ok(0);
+            }
+        };
+
+        // Use the original salts from the WAL header for checksum validation
+        self.salt1.store(header_salt1, std::sync::atomic::Ordering::Relaxed);
+        self.salt2.store(header_salt2, std::sync::atomic::Ordering::Relaxed);
 
         // Read frames
         let frames = self.read_all_frames(&mut wal_file)?;
@@ -291,8 +294,8 @@ impl WalManager {
         header[4..8].copy_from_slice(&WAL_VERSION.to_le_bytes());
         header[8..12].copy_from_slice(&self.page_size.to_le_bytes());
         header[12..16].copy_from_slice(&(*self.sequence.lock() as u32).to_le_bytes());
-        header[16..20].copy_from_slice(&self.salt1.to_le_bytes());
-        header[20..24].copy_from_slice(&self.salt2.to_le_bytes());
+        header[16..20].copy_from_slice(&self.salt1.load(std::sync::atomic::Ordering::Relaxed).to_le_bytes());
+        header[20..24].copy_from_slice(&self.salt2.load(std::sync::atomic::Ordering::Relaxed).to_le_bytes());
 
         // Checksum over first 24 bytes
         let checksum = crc32fast::hash(&header[..24]) as u64;
@@ -305,28 +308,27 @@ impl WalManager {
         Ok(())
     }
 
-    fn validate_wal_header(&self, file: &mut File) -> Result<()> {
+    /// Read the WAL header and return (salt1, salt2). Used by recovery to preserve checksum context.
+    fn read_wal_header(&self, file: &mut File) -> Result<(u32, u32)> {
         file.seek(SeekFrom::Start(0))?;
         let mut header = [0u8; WAL_HEADER_SIZE];
         file.read_exact(&mut header)?;
 
         let magic = u32::from_le_bytes([header[0], header[1], header[2], header[3]]);
         if magic != WAL_MAGIC {
-            return Err(StorageError::WalCorrupted(format!(
-                "Invalid WAL magic: 0x{:08X}",
-                magic
-            )));
+            return Err(StorageError::WalCorrupted(format!("Invalid WAL magic: 0x{:08X}", magic)));
         }
-
         let version = u32::from_le_bytes([header[4], header[5], header[6], header[7]]);
         if version != WAL_VERSION {
-            return Err(StorageError::WalCorrupted(format!(
-                "Unsupported WAL version: {}",
-                version
-            )));
+            return Err(StorageError::WalCorrupted(format!("Unsupported WAL version: {}", version)));
         }
+        let s1 = u32::from_le_bytes([header[16], header[17], header[18], header[19]]);
+        let s2 = u32::from_le_bytes([header[20], header[21], header[22], header[23]]);
+        Ok((s1, s2))
+    }
 
-        Ok(())
+    fn validate_wal_header(&self, file: &mut File) -> Result<()> {
+        self.read_wal_header(file).map(|_| ())
     }
 
     fn read_all_frames(&self, file: &mut File) -> Result<Vec<WalFrame>> {
@@ -363,10 +365,11 @@ impl WalManager {
             let mut page_data = vec![0u8; self.page_size as usize];
             file.read_exact(&mut page_data)?;
 
-            // Verify checksums
-            let (computed_cs1, computed_cs2) = Self::compute_frame_checksum(
-                page_number, &page_data, self.salt1, self.salt2, 0,
-            );
+            let s1 = self.salt1.load(std::sync::atomic::Ordering::Relaxed);
+            let s2 = self.salt2.load(std::sync::atomic::Ordering::Relaxed);
+            let (computed_cs1, computed_cs2) = Self::compute_frame_checksum(page_number, &page_data, s1, s2, 0);
+            // Recompute with frame_seq=0 since append_frame uses the sequence counter
+            // which is reset on checkpoint. Salts provide sufficient uniqueness.
             if computed_cs1 != stored_cs1 || computed_cs2 != stored_cs2 {
                 log::warn!("WAL frame checksum mismatch at offset {}: page {}", offset, page_number);
                 break; // Stop recovery here; data beyond this point may be corrupt
