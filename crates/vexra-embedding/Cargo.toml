@@ -3,18 +3,23 @@ name = "vexra-embedding"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "EmbedDB text embedding engine (hash-based + optional ONNX)"
+description = "Vexra text embedding engine (hash-based + optional ONNX)"
 
 [features]
 default = []
-# Enable ONNX Runtime integration (requires libonnxruntime installed)
-onnx = []  # "ort", "tokenizers", "hf-hub"
+# Enable ONNX Runtime for production-quality embeddings.
+# Requires: libonnxruntime installed on the system.
+# Install: https://github.com/microsoft/onnxruntime/releases
+onnx = ["dep:ort", "dep:tokenizers", "dep:hf-hub"]
 
 [dependencies]
 vexra-core = { path = "../vexra-core" }
 serde.workspace = true
 thiserror.workspace = true
 
-# Future: ort = { version = "2", optional = true }
-# Future: tokenizers = { version = "0.21", optional = true }
-# Future: hf-hub = { version = "0.4", optional = true }
+# ONNX Runtime (optional)
+ort = { version = "2.0.0-rc.12", optional = true, default-features = false }
+# HuggingFace tokenizers (optional)
+tokenizers = { version = "0.21", optional = true, default-features = false }
+# HuggingFace Hub model download (optional)
+hf-hub = { version = "0.4", optional = true }

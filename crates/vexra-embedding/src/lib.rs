@@ -18,18 +18,29 @@
 //! ```
 
 pub mod simple;
-// pub mod onnx;  // Feature-gated behind "onnx"
+#[cfg(feature = "onnx")]
+pub mod onnx;
 
 pub use simple::SimpleEmbedder;
 
 /// Trait for text embedding backends.
 pub trait Embedder: Send + Sync {
-    /// Embed text into a fixed-dimension vector.
     fn embed(&self, text: &str) -> Vec<f32>;
-    /// Get the output dimension.
     fn dimension(&self) -> usize;
-    /// Embed multiple texts in a batch.
     fn embed_batch(&self, texts: &[&str]) -> Vec<Vec<f32>> {
         texts.iter().map(|t| self.embed(t)).collect()
     }
+}
+
+/// Create an embedder. Returns an OnnxEmbedder if the `onnx` feature is enabled
+/// and the model is available; falls back to SimpleEmbedder otherwise.
+pub fn create_embedder(dimension: usize) -> Box<dyn Embedder> {
+    #[cfg(feature = "onnx")]
+    {
+        match onnx::OnnxEmbedder::new(dimension) {
+            Ok(e) => return Box::new(e),
+            Err(_) => log::warn!("ONNX model not available, falling back to SimpleEmbedder"),
+        }
+    }
+    Box::new(SimpleEmbedder::new(dimension))
 }
