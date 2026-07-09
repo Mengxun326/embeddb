@@ -34,6 +34,14 @@ pub trait Embedder: Send + Sync {
     }
 }
 
+/// L2-normalize a vector in-place.
+pub fn l2_normalize(v: &mut [f32]) {
+    let norm: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm > 0.0 {
+        for x in v { *x /= norm; }
+    }
+}
+
 /// Create an embedder. Returns an OnnxEmbedder if the `onnx` feature is enabled
 /// and the model is available; falls back to SimpleEmbedder otherwise.
 pub fn create_embedder(dimension: usize) -> Box<dyn Embedder> {

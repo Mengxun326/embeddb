@@ -14,7 +14,6 @@ onnx = ["dep:ort", "dep:tokenizers", "dep:hf-hub"]
 
 [dependencies]
 vexra-core = { path = "../vexra-core" }
-serde.workspace = true
 log.workspace = true
 
 # ONNX Runtime (optional)

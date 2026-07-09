@@ -125,11 +125,7 @@ impl OnnxEmbedder {
         if mask_sum > 0.0 {
             for v in &mut result { *v /= mask_sum; }
         }
-        // L2 normalize
-        let norm: f32 = result.iter().map(|v| v * v).sum::<f32>().sqrt();
-        if norm > 0.0 {
-            for v in &mut result { *v /= norm; }
-        }
+        crate::l2_normalize(&mut result);
         result
     }
 }

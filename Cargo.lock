@@ -3026,7 +3026,6 @@ dependencies = [
  "hf-hub",
  "log",
  "ort",
- "serde",
  "tokenizers",
  "vexra-core",
 ]

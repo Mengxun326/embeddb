@@ -56,14 +56,7 @@ impl Embedder for SimpleEmbedder {
             vector[idx] += 0.25;
         }
 
-        // L2 normalize
-        let norm: f32 = vector.iter().map(|v| v * v).sum::<f32>().sqrt();
-        if norm > 0.0 {
-            for v in &mut vector {
-                *v /= norm;
-            }
-        }
-
+        crate::l2_normalize(&mut vector);
         vector
     }
 }
