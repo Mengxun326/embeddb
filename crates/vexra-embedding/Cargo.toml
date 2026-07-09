@@ -15,7 +15,7 @@ onnx = ["dep:ort", "dep:tokenizers", "dep:hf-hub"]
 [dependencies]
 vexra-core = { path = "../vexra-core" }
 serde.workspace = true
-thiserror.workspace = true
+log.workspace = true
 
 # ONNX Runtime (optional)
 ort = { version = "2.0.0-rc.12", optional = true, default-features = false, features = ["std", "ndarray"] }
