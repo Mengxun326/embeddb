@@ -17,7 +17,7 @@ jobs:
       - run: pip install maturin
       - working-directory: sdk/python
         run: maturin build --release && maturin sdist
-      - run: pip install twine && twine upload sdk/python/target/wheels/*.whl sdk/python/target/wheels/*.tar.gz
+      - run: pip install twine && twine upload --skip-existing sdk/python/target/wheels/*.whl sdk/python/target/wheels/*.tar.gz
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
@@ -33,7 +33,7 @@ jobs:
       - run: pip install maturin
       - working-directory: sdk/python
         run: maturin build --release
-      - run: pip install twine && twine upload sdk/python/target/wheels/*.whl
+      - run: pip install twine && twine upload --skip-existing sdk/python/target/wheels/*.whl
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
@@ -49,7 +49,7 @@ jobs:
       - run: pip install maturin
       - working-directory: sdk/python
         run: maturin build --release
-      - run: pip install twine && twine upload sdk/python/target/wheels/*.whl
+      - run: pip install twine && twine upload --skip-existing sdk/python/target/wheels/*.whl
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
