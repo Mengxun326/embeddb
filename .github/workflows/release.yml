@@ -8,7 +8,6 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Build and publish Rust crate
   publish-crates:
     runs-on: ubuntu-latest
     steps:
@@ -17,30 +16,33 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Publish to crates.io
         run: |
-          for crate in vexra-storage vexra-index vexra-metadata vexra-query vexra-embedding vexra-core vexra-ffi vexra-server vexra-cli; do
-            cargo publish -p $crate
+          CRATES="vexra-storage vexra-index vexra-metadata vexra-embedding vexra-core vexra-query vexra-ffi vexra-server vexra-cli"
+          for crate in $CRATES; do
+            echo "Publishing $crate..."
+            cargo publish -p $crate --allow-dirty || echo "$crate may already be published, continuing..."
+            sleep 5
           done
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-  # Build CLI binaries for all platforms
   build-cli:
+    needs: publish-crates
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact: embeddb-linux-amd64
+            artifact: vexra-linux-amd64
           - os: macos-latest
             target: x86_64-apple-darwin
-            artifact: embeddb-macos-amd64
+            artifact: vexra-macos-amd64
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact: embeddb-macos-arm64
+            artifact: vexra-macos-arm64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact: embeddb-windows-amd64.exe
+            artifact: vexra-windows-amd64.exe
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -53,37 +55,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: target/${{ matrix.target }}/release/embeddb*
-
-  # Build Python wheels
-  build-python:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Build Python wheel
-        run: |
-          pip install maturin
-          cd sdk/python && maturin build --release
-      - name: Upload wheel
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-wheels-${{ matrix.os }}
-          path: sdk/python/target/wheels/*.whl
+          path: target/${{ matrix.target }}/release/vexra*
 
   create-release:
-    needs: [build-cli, build-python]
+    needs: build-cli
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v2
         with:
           files: artifacts/**/*
           generate_release_notes: true
