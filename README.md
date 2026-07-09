@@ -5,7 +5,7 @@
 <h1 align="center">Vexra</h1>
 
 <p align="center">
-  <strong>面向向量的 SQLite。</strong><br>
+  <strong>面向向量的 SQLite</strong><br>
   一个嵌入式、单文件的向量数据库，适合本地 AI 应用、RAG 原型和边缘服务。
 </p>
 
