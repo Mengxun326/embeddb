@@ -5,8 +5,14 @@
 <h1 align="center">Vexra</h1>
 
 <p align="center">
-  <strong>SQLite for vectors.</strong><br>
-  An embedded, single-file vector database for local AI applications, RAG prototypes, and edge services.
+  <strong>面向向量的 SQLite。</strong><br>
+  一个嵌入式、单文件的向量数据库，适合本地 AI 应用、RAG 原型和边缘服务。
+</p>
+
+<p align="center">
+  <a href="README.md"><strong>简体中文</strong></a>
+  ·
+  <a href="README.en.md">English</a>
 </p>
 
 <p align="center">
@@ -17,28 +23,28 @@
   <img src="https://img.shields.io/badge/status-release%20candidate-15b8a6" alt="Release candidate">
 </p>
 
-Vexra is a Rust-native embedded vector database. It runs inside your application process, stores vectors and metadata in a local database file, and exposes the same engine through a Rust API, CLI, HTTP server, Python bindings, JavaScript bindings, and a C FFI layer.
+Vexra 是一个 Rust 原生的嵌入式向量数据库。它运行在应用进程内，将向量和元数据持久化到本地数据库文件，并通过同一套核心引擎提供 Rust API、命令行工具、HTTP 服务、Python 绑定、JavaScript 绑定和 C FFI。
 
-Use Vexra when you want vector search without operating a separate database service: local-first AI tools, desktop apps, test fixtures, small RAG systems, on-device semantic search, or edge deployments where one binary and one data file are easier to ship.
+当你希望获得向量检索能力，又不想部署独立数据库服务时，Vexra 会很合适：本地优先的 AI 工具、桌面应用、测试夹具、小型 RAG 系统、端侧语义搜索，以及“一份二进制 + 一个数据文件”更容易交付的边缘场景。
 
-## Highlights
+## 特性
 
-| Capability | What it gives you |
+| 能力 | 说明 |
 | --- | --- |
-| Embedded deployment | Link the Rust crate, use the CLI, or start the built-in HTTP server. No external daemon is required. |
-| Single-file persistence | Collections, vectors, metadata, and catalog state live in a Vexra database file. |
-| WAL recovery | Write-ahead logging and checkpointing protect writes across process restarts. |
-| Vector indexes | Exact Flat search for small collections and HNSW approximate nearest neighbor search for scale. |
-| Distance metrics | Cosine, Euclidean, and dot product scoring. |
-| Metadata filters | Store JSON metadata and filter searches with expressions such as `kind = "note" AND score > 0.8`. |
-| Hybrid search modules | Workspace crates include simple embeddings, BM25 sparse retrieval, and reciprocal-rank fusion building blocks. |
-| SIMD kernels | Distance kernels include scalar fallback plus AVX2 and NEON paths where available. |
-| Multi-language surface | Rust, CLI, HTTP, Python, JavaScript, and C ABI entry points share the same core engine. |
-| Dashboard | `vexra serve` starts a local management UI and REST API. |
+| 嵌入式部署 | 直接链接 Rust crate、使用 CLI，或启动内置 HTTP 服务；不需要额外守护进程。 |
+| 单文件持久化 | Collection、向量、元数据和 catalog 状态都保存在 Vexra 数据库文件中。 |
+| WAL 恢复 | 通过预写日志和 checkpoint 机制保护写入，降低进程重启后的数据风险。 |
+| 向量索引 | Flat 精确检索适合小集合；HNSW 近似最近邻检索适合更大规模。 |
+| 距离度量 | 支持 Cosine、Euclidean 和 dot product。 |
+| 元数据过滤 | 存储 JSON 元数据，并用 `kind = "note" AND score > 0.8` 这样的表达式过滤搜索结果。 |
+| 混合检索模块 | Workspace 包含简单 embedding、BM25 稀疏检索和 RRF 融合等构建模块。 |
+| SIMD 距离内核 | 距离计算包含标量 fallback，并在可用平台上使用 AVX2 和 NEON 路径。 |
+| 多语言接口 | Rust、CLI、HTTP、Python、JavaScript 和 C ABI 都复用同一个核心引擎。 |
+| Dashboard | `vexra serve` 可启动本地管理界面和 REST API。 |
 
-## Quick Start
+## 快速开始
 
-Install the CLI from a checkout:
+从源码安装 CLI：
 
 ```bash
 git clone https://github.com/Mengxun326/Vexra.git
@@ -46,7 +52,7 @@ cd Vexra
 cargo install --path crates/vexra-cli
 ```
 
-Create a database, add a collection, insert a vector, and search it:
+创建数据库、创建 collection、插入向量并搜索：
 
 ```bash
 vexra --path data.vexra init
@@ -65,13 +71,13 @@ vexra --path data.vexra search \
   --format json
 ```
 
-Start the local API and dashboard:
+启动本地 API 和 Dashboard：
 
 ```bash
 vexra --path data.vexra serve --host 127.0.0.1 --port 9020
 ```
 
-Then open `http://127.0.0.1:9020`.
+然后打开 `http://127.0.0.1:9020`。
 
 ## Rust API
 
@@ -120,7 +126,7 @@ fn main() -> vexra_core::Result<()> {
 
 ## Python API
 
-The Python package is published as `vexra`.
+Python 包名为 `vexra`：
 
 ```bash
 pip install vexra
@@ -143,13 +149,13 @@ db.close()
 
 ## HTTP API
 
-Run the server:
+启动服务：
 
 ```bash
 vexra --path data.vexra serve --port 9020
 ```
 
-Create a collection:
+创建 collection：
 
 ```bash
 curl -X POST http://127.0.0.1:9020/api/collections \
@@ -157,7 +163,7 @@ curl -X POST http://127.0.0.1:9020/api/collections \
   -d '{"name":"docs","dimension":4,"distance":"cosine"}'
 ```
 
-Insert a document:
+插入文档：
 
 ```bash
 curl -X POST http://127.0.0.1:9020/api/collections/docs/documents \
@@ -165,7 +171,7 @@ curl -X POST http://127.0.0.1:9020/api/collections/docs/documents \
   -d '{"id":"doc-1","vector":[0.12,0.24,0.36,0.48],"metadata":{"kind":"note"}}'
 ```
 
-Search:
+搜索：
 
 ```bash
 curl -X POST http://127.0.0.1:9020/api/collections/docs/search \
@@ -173,7 +179,7 @@ curl -X POST http://127.0.0.1:9020/api/collections/docs/search \
   -d '{"vector":[0.10,0.20,0.30,0.40],"top_k":5,"filter":"kind = \"note\""}'
 ```
 
-## Architecture
+## 架构
 
 ```text
 Applications
@@ -198,41 +204,41 @@ vexra-core
         `-- vexra-embedding simple local text embedding utilities
 ```
 
-## Workspace Layout
+## Workspace 结构
 
-| Path | Purpose |
+| 路径 | 作用 |
 | --- | --- |
-| `crates/vexra-core` | Public Rust API, database handle, collections, document operations. |
-| `crates/vexra-storage` | Page-based storage engine, database format, page cache, WAL. |
-| `crates/vexra-index` | Flat and HNSW vector indexes plus distance kernels. |
-| `crates/vexra-metadata` | JSON metadata storage and filter expressions. |
-| `crates/vexra-query` | BM25 sparse retrieval and fusion utilities. |
-| `crates/vexra-embedding` | Lightweight local embedding helpers. |
-| `crates/vexra-cli` | `vexra` command-line interface. |
-| `crates/vexra-server` | Axum REST API and embedded dashboard. |
-| `crates/vexra-ffi` | C ABI for integrations with other runtimes. |
-| `sdk/python` | PyO3-based Python package. |
-| `sdk/javascript` | napi-rs based Node.js package. |
+| `crates/vexra-core` | 公共 Rust API、数据库句柄、collection 和文档操作。 |
+| `crates/vexra-storage` | 基于 page 的存储引擎、数据库格式、page cache 和 WAL。 |
+| `crates/vexra-index` | Flat/HNSW 向量索引和距离计算内核。 |
+| `crates/vexra-metadata` | JSON 元数据存储和过滤表达式。 |
+| `crates/vexra-query` | BM25 稀疏检索和融合工具。 |
+| `crates/vexra-embedding` | 轻量级本地 embedding 工具。 |
+| `crates/vexra-cli` | `vexra` 命令行工具。 |
+| `crates/vexra-server` | Axum REST API 和内置 Dashboard。 |
+| `crates/vexra-ffi` | 面向其他运行时集成的 C ABI。 |
+| `sdk/python` | 基于 PyO3 的 Python 包。 |
+| `sdk/javascript` | 基于 napi-rs 的 Node.js 包。 |
 
-## Status
+## 项目状态
 
-Vexra is in an early release-candidate phase. The core storage, collection, vector search, CLI, Python bindings, and HTTP API are usable, but APIs may still change before a stable 1.x line. For production workloads, benchmark with your own data, keep backups, and pin exact versions.
+Vexra 目前处于早期 release candidate 阶段。核心存储、collection、向量检索、CLI、Python 绑定和 HTTP API 已可使用，但稳定 1.x 之前 API 仍可能调整。用于生产工作负载前，请使用自己的数据做基准测试、保留备份，并固定具体版本。
 
-Near-term focus:
+近期重点：
 
-- Align all package metadata, docs, and SDK examples around the Vexra name.
-- Expand query examples for metadata filters, HNSW tuning, and hybrid retrieval.
-- Improve storage compaction and long-running write workloads.
-- Publish deeper benchmarks for Flat vs HNSW search behavior.
+- 将所有包元数据、文档和 SDK 示例统一到 Vexra 命名。
+- 扩展元数据过滤、HNSW 调优和混合检索示例。
+- 改进 storage compaction 和长时间写入场景。
+- 发布更完整的 Flat 与 HNSW 检索行为基准测试。
 
-## Brand Asset
+## 品牌资产
 
-The Vexra mark lives at [`assets/vexra-logo.svg`](assets/vexra-logo.svg). It combines a database cylinder, vector graph nodes, and a V-shaped search path so the icon still reads clearly at small sizes.
+Vexra 图标位于 [`assets/vexra-logo.svg`](assets/vexra-logo.svg)。它融合了数据库圆柱、向量节点和 V 形搜索路径，在较小尺寸下也能保持清晰识别。
 
-## Contributing
+## 贡献
 
-Contributions are welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request, and use GitHub Issues for bug reports, feature requests, and design discussions.
+欢迎贡献。提交 pull request 前请阅读 [`CONTRIBUTING.md`](CONTRIBUTING.md)，bug 报告、功能请求和设计讨论可以通过 GitHub Issues 发起。
 
-## License
+## 许可证
 
-Vexra is released under the [MIT License](LICENSE).
+Vexra 使用 [MIT License](LICENSE) 发布。
