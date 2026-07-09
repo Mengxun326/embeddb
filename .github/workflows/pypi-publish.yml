@@ -13,10 +13,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-python@v5
-        with: { python-version: '3.11' }
+        with: { python-version: '3.12' }
       - run: pip install maturin
       - working-directory: sdk/python
-        run: maturin build --release && maturin sdist
+        run: maturin build --release -i python3.12 && maturin sdist -i python3.12
       - run: pip install twine && twine upload --skip-existing sdk/python/target/wheels/*.whl sdk/python/target/wheels/*.tar.gz
         env:
           TWINE_USERNAME: __token__
@@ -29,10 +29,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-python@v5
-        with: { python-version: '3.11' }
+        with: { python-version: '3.12' }
       - run: pip install maturin
       - working-directory: sdk/python
-        run: maturin build --release
+        run: maturin build --release -i python3.12
       - run: pip install twine && twine upload --skip-existing sdk/python/target/wheels/*.whl
         env:
           TWINE_USERNAME: __token__
@@ -45,10 +45,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-python@v5
-        with: { python-version: '3.11' }
+        with: { python-version: '3.12' }
       - run: pip install maturin
       - working-directory: sdk/python
-        run: maturin build --release
+        run: maturin build --release -i python3.12
       - run: pip install twine && twine upload --skip-existing sdk/python/target/wheels/*.whl
         env:
           TWINE_USERNAME: __token__
