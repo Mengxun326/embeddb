@@ -43,9 +43,13 @@ pub struct CollectionConfig {
     #[serde(default)]
     pub description: String,
 
-    /// Page ID for the vector data page (0 = not yet allocated).
+    /// Page ID for the first vector data page (0 = not yet allocated).
     #[serde(default)]
     pub data_root_page: u64,
+
+    /// Additional vector data pages (appended when the root page is full).
+    #[serde(default)]
+    pub data_pages: Vec<u64>,
 
     /// Page ID for the metadata page (0 = not yet allocated).
     #[serde(default)]
@@ -77,6 +81,7 @@ impl CollectionConfig {
             distance: DistanceMetric::Cosine,
             description: String::new(),
             data_root_page: 0,
+            data_pages: Vec::new(),
             metadata_root_page: 0,
             hnsw_edge_page: 0,
             index_type: "flat".to_string(),

@@ -180,6 +180,24 @@ pub struct Collection {
 
 impl Collection {
     /// Collect all tombstone document IDs from a page.
+    /// Write a vector cell to the current data page. If the page is full, allocate a new one.
+    /// Returns true if the cell was written successfully.
+    fn write_vector_cell(&mut self, pc: &Arc<PageCache>, cell: &[u8]) -> Result<bool> {
+        // Try the last allocated data page first (fast path)
+        let last_page = self.config.data_pages.last().copied().unwrap_or(self.config.data_root_page);
+        let written = pc.write_cell(last_page, cell, None).map_err(Error::Storage)?;
+        if written { return Ok(true); }
+
+        // Page is full — allocate a new one
+        let new_page = pc.allocate_page(PageType::Vector, 0).map_err(Error::Storage)?;
+        let written = pc.write_cell(new_page, cell, None).map_err(Error::Storage)?;
+        if written {
+            self.config.data_pages.push(new_page);
+            return Ok(true);
+        }
+        Ok(false) // Should not happen on a fresh page
+    }
+
     fn collect_tombstones(&self, pg: &vexra_storage::page_cache::CachedPage) -> std::collections::HashSet<String> {
         let mut set = std::collections::HashSet::new();
         let header = pg.header();
@@ -277,7 +295,7 @@ impl Collection {
         Ok(collection)
     }
 
-    /// Load vectors from the data page into the index.
+    /// Load vectors from all data pages into the index.
     fn load_vectors(&mut self) -> Result<()> {
         let pc = match self.page_cache.as_ref() {
             Some(pc) => pc,
@@ -285,25 +303,25 @@ impl Collection {
         };
         if self.config.data_root_page == 0 { return Ok(()); }
 
-        let page = pc.get_page(self.config.data_root_page).map_err(Error::Storage)?;
-        let pg = page.read();
-        let header = pg.header();
+        let mut page_ids = vec![self.config.data_root_page];
+        page_ids.extend_from_slice(&self.config.data_pages);
 
-        // Track tombstones to skip deleted documents
-        let tombstones = self.collect_tombstones(&pg);
-
-        for i in 0..header.num_cells {
-            if let Some(data) = pg.cell_data(i) {
-                // Skip tombstone cells (zero-length payload beyond id prefix)
-                if data.len() >= 4 {
-                    let id_len = u32::from_le_bytes([data[0],data[1],data[2],data[3]]) as usize;
-                    if is_tombstone(&data, id_len) { continue; }
-                }
-                if let Some((doc_id, internal_id, vector)) = decode_vector_cell(&data) {
-                    if tombstones.contains(&doc_id) { continue; }
-                    let _ = self.index.insert(internal_id, &vector);
-                    self.id_map.insert(doc_id.clone(), internal_id);
-                    self.reverse_id_map.insert(internal_id, doc_id);
+        for &page_id in &page_ids {
+            let page = pc.get_page(page_id).map_err(Error::Storage)?;
+            let pg = page.read();
+            let tombstones = self.collect_tombstones(&pg);
+            for i in 0..pg.header().num_cells {
+                if let Some(data) = pg.cell_data(i) {
+                    if data.len() >= 4 {
+                        let id_len = u32::from_le_bytes([data[0],data[1],data[2],data[3]]) as usize;
+                        if is_tombstone(&data, id_len) { continue; }
+                    }
+                    if let Some((doc_id, internal_id, vector)) = decode_vector_cell(&data) {
+                        if tombstones.contains(&doc_id) { continue; }
+                        let _ = self.index.insert(internal_id, &vector);
+                        self.id_map.insert(doc_id.clone(), internal_id);
+                        self.reverse_id_map.insert(internal_id, doc_id);
+                    }
                 }
             }
         }
@@ -342,9 +360,11 @@ impl Collection {
         self.config.metadata_root_page
     }
 
-    /// Get a reference to the config (with updated page IDs).
+    /// Get a reference to the config (with updated page IDs including overflow pages).
     pub fn config_snapshot(&self) -> CollectionConfig {
-        self.config.clone()
+        let mut c = self.config.clone();
+        c.data_pages = self.config.data_pages.clone();
+        c
     }
 
     // --- Public API ---
@@ -374,18 +394,20 @@ impl Collection {
             }
             self.index.insert(internal_id, vector)?;
 
-            // Persist vector to data page
-            if let Some(ref pc) = self.page_cache {
-                let cell = encode_vector_cell(&doc_id, internal_id, vector);
-                let written = pc
-                    .write_cell(self.config.data_root_page, &cell, None)
-                    .map_err(Error::Storage)?;
-                if !written {
-                    return Err(Error::Other("Vector data page full".into()));
-                }
+            // Persist vector to data page (allocate new page if full)
+            let need_hnsw_save = self.config.hnsw_edge_page != 0 && matches!(self.index, IndexBackend::Hnsw(_));
+            let pc = self.page_cache.clone();
+            let cell = encode_vector_cell(&doc_id, internal_id, vector);
+            let written = if let Some(ref pc) = pc {
+                self.write_vector_cell(pc, &cell)?
+            } else { true };
+            if !written {
+                return Err(Error::Other("Vector data page full".into()));
+            }
 
-                // Save HNSW graph edges if using HNSW
-                if let IndexBackend::Hnsw(ref graph) = self.index {
+            // Save HNSW graph edges
+            if need_hnsw_save {
+                if let (Some(ref pc), IndexBackend::Hnsw(ref graph)) = (pc.as_ref(), &self.index) {
                     if self.config.hnsw_edge_page != 0 {
                         let _ = graph.save_to_page(pc, self.config.hnsw_edge_page);
                     }

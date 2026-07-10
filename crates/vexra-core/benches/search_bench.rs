@@ -148,20 +148,18 @@ fn bench_recall_hnsw(c: &mut Criterion) {
 
 fn bench_persist_collection(c: &mut Criterion) {
     let mut group = c.benchmark_group("persist_collection");
-    let dim = 16;
-    let n = 20;
+    let n = 100;
 
-    group.bench_function("insert_20_persist_16d", |b| {
+    group.bench_function("insert_100_persist", |b| {
         b.iter(|| {
             let dir = tempfile::tempdir().unwrap();
             let path = dir.path().join("bench.vexra");
             let pc = std::sync::Arc::new(
                 vexra_storage::page_cache::PageCache::open(&path, Default::default()).unwrap(),
             );
-            let mut config = CollectionConfig::new("bench", dim);
-            config.index_type = "flat".to_string();
+            let config = CollectionConfig::new("bench", DIM);
             let mut col = Collection::new_persistent(config, IndexType::Flat, pc).unwrap();
-            let vectors = random_vectors_dim(n, dim);
+            let vectors = random_vectors(n);
             for (i, v) in vectors.iter().enumerate() {
                 col.insert(vexra_core::config::Document::with_vector(
                     format!("doc_{}", i), v.clone(),
