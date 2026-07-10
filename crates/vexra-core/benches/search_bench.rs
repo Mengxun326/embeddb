@@ -15,12 +15,15 @@ use std::time::Duration;
 
 const DIM: usize = 128;
 
-/// Generate `n` random normalized vectors of dimension `DIM`.
+/// Generate `n` random vectors of dimension `DIM`.
 fn random_vectors(n: usize) -> Vec<Vec<f32>> {
+    random_vectors_dim(n, DIM)
+}
+
+/// Generate `n` random vectors of a given dimension.
+fn random_vectors_dim(n: usize, dim: usize) -> Vec<Vec<f32>> {
     let mut rng = rand::thread_rng();
-    (0..n)
-        .map(|_| (0..DIM).map(|_| rng.gen::<f32>()).collect())
-        .collect()
+    (0..n).map(|_| (0..dim).map(|_| rng.gen::<f32>()).collect()).collect()
 }
 
 /// Build a random FlatIndex with `n` vectors.
@@ -145,18 +148,20 @@ fn bench_recall_hnsw(c: &mut Criterion) {
 
 fn bench_persist_collection(c: &mut Criterion) {
     let mut group = c.benchmark_group("persist_collection");
-    let n = 1000;
+    let dim = 16;
+    let n = 20;
 
-    group.bench_function("insert_1000_persist", |b| {
+    group.bench_function("insert_20_persist_16d", |b| {
         b.iter(|| {
             let dir = tempfile::tempdir().unwrap();
-            let path = dir.path().join("bench.embeddb");
+            let path = dir.path().join("bench.vexra");
             let pc = std::sync::Arc::new(
                 vexra_storage::page_cache::PageCache::open(&path, Default::default()).unwrap(),
             );
-            let config = CollectionConfig::new("bench", DIM);
+            let mut config = CollectionConfig::new("bench", dim);
+            config.index_type = "flat".to_string();
             let mut col = Collection::new_persistent(config, IndexType::Flat, pc).unwrap();
-            let vectors = random_vectors(n);
+            let vectors = random_vectors_dim(n, dim);
             for (i, v) in vectors.iter().enumerate() {
                 col.insert(vexra_core::config::Document::with_vector(
                     format!("doc_{}", i), v.clone(),
