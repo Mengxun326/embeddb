@@ -17,7 +17,10 @@
 
 <p align="center">
   <a href="https://github.com/Mengxun326/Vexra/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Mengxun326/Vexra/ci.yml?branch=master&label=CI" alt="CI"></a>
+  <a href="https://crates.io/crates/vexra-cli"><img src="https://img.shields.io/crates/v/vexra-cli?label=crates.io" alt="crates.io"></a>
+  <a href="https://www.npmjs.com/package/@mengxun326/vexra"><img src="https://img.shields.io/npm/v/@mengxun326/vexra?label=npm" alt="npm"></a>
   <a href="https://pypi.org/project/vexra/"><img src="https://img.shields.io/pypi/v/vexra?label=PyPI" alt="PyPI"></a>
+  <a href="https://github.com/Mengxun326/Vexra/pkgs/container/vexra"><img src="https://img.shields.io/badge/docker-ghcr.io-blue" alt="Docker"></a>
   <a href="https://github.com/Mengxun326/Vexra/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License"></a>
   <img src="https://img.shields.io/badge/rust-2021-f74c00" alt="Rust 2021">
   <img src="https://img.shields.io/badge/status-release%20candidate-15b8a6" alt="Release candidate">
@@ -44,7 +47,22 @@ Vexra 是一个 Rust 原生的嵌入式向量数据库。它运行在应用进�
 
 ## 快速开始
 
-从源码安装 CLI：
+**从包管理器安装：**
+
+```bash
+cargo install vexra-cli        # Rust / crates.io
+pip install vexra               # Python / PyPI
+npm install @mengxun326/vexra   # Node.js / npm
+docker pull ghcr.io/mengxun326/vexra:v1.3.1  # Docker
+```
+
+**Docker 一行启动：**
+
+```bash
+docker run -p 9020:9020 -v ./data:/data ghcr.io/mengxun326/vexra:v1.3.1
+```
+
+**从源码安装 CLI：**
 
 ```bash
 git clone https://github.com/Mengxun326/Vexra.git
