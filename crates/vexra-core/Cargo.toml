@@ -3,7 +3,7 @@ name = "vexra-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "EmbedDB core: public API, Database and Collection handles"
+description = "Vexra core: public API, Database and Collection handles"
 
 [dependencies]
 vexra-storage = { path = "../vexra-storage" }
@@ -19,6 +19,10 @@ parking_lot.workspace = true
 tempfile = "3"
 rand = "0.8"
 criterion = { version = "0.5", features = ["html_reports"] }
+
+[[test]]
+name = "integration"
+path = "../../tests/integration/lifecycle.rs"
 
 [[bench]]
 name = "search_bench"
