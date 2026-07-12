@@ -1,6 +1,25 @@
 # Changelog
 
-All notable changes to EmbedDB will be documented in this file.
+All notable changes to Vexra will be documented in this file.
+
+## [1.4.0] — 2026-07-10
+
+### Added
+- Multi-page data overflow: auto-allocate new pages when data/metadata pages are full
+- 8 end-to-end integration tests (CRUD lifecycle, persistence, HNSW recall, bulk insert)
+- GitHub Pages benchmark report with automated CI deployment
+- Docker multi-arch image published to ghcr.io
+
+### Fixed
+- WAL checksums now verified correctly on recovery (salts stored in WAL header)
+- delete() tombstones correctly written to overflow pages (prevents doc resurrection)
+- insert() ordering: persist to disk before updating in-memory index
+- Metadata page overflow support (was limited to single ~3KB page)
+- Various branding references (EmbedDB → Vexra) in docs
+
+### Changed
+- Benchmarks: persist_collection now uses 128-dim vectors with page overflow
+- CI: release workflow simplified, PyPI uses Python 3.12, npm/pypi use --skip-existing
 
 ## [1.0.0-rc1] — 2026-07-09
 
