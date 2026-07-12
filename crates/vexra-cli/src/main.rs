@@ -195,7 +195,7 @@ fn cmd_init(path: &std::path::Path, page_size: u32) -> Result<(), String> {
 fn cmd_create_collection(path: &std::path::Path, name: &str, dim: usize, distance: &str, index: &str) -> Result<(), String> {
     let db = Database::open(path).map_err(|e| e.to_string())?;
     let metric = match distance { "euclidean" => vexra_core::DistanceMetric::Euclidean, "dot" => vexra_core::DistanceMetric::DotProduct, _ => vexra_core::DistanceMetric::Cosine, };
-    let config = CollectionConfig { name: name.to_string(), dimension: dim, distance: metric, description: String::new(), data_root_page: 0, metadata_root_page: 0, hnsw_edge_page: 0, index_type: index.to_string(), };
+    let config = CollectionConfig { name: name.to_string(), dimension: dim, distance: metric, description: String::new(), data_root_page: 0, data_pages: Vec::new(), metadata_root_page: 0, metadata_pages: Vec::new(), hnsw_edge_page: 0, index_type: index.to_string(), };
     db.create_collection(config).map_err(|e| e.to_string())?;
     println!("Created collection '{}' with dimension {}, distance={}, index={}", name, dim, distance, index);
     db.close().map_err(|e| e.to_string())?;
