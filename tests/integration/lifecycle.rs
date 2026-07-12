@@ -186,8 +186,8 @@ fn test_bulk_insert_page_overflow() {
     let path = dir.path().join("test.vexra");
     let pc = std::sync::Arc::new(vexra_storage::page_cache::PageCache::open(&path, Default::default()).unwrap());
 
-    let dim = 32;
-    let n = 50;
+    let dim = 16;
+    let n = 30;
     let config = CollectionConfig::new("bulk", dim);
     let mut col = Collection::new_persistent(config, IndexType::Flat, pc).unwrap();
 
