@@ -20,14 +20,13 @@ use std::sync::Arc;
 
 /// Supported index backends.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Default)]
 pub enum IndexType {
+    #[default]
     Flat,
     Hnsw,
 }
 
-impl Default for IndexType {
-    fn default() -> Self { IndexType::Flat }
-}
 
 /// Dispatch enum over FlatIndex or HnswGraph.
 pub enum IndexBackend {
@@ -307,7 +306,7 @@ impl Collection {
                 *graph = vexra_index::hnsw::graph::HnswGraph::load_from_page(
                     &pc, hnsw_edge_page, dimension, distance,
                     vexra_index::hnsw::HnswConfig::default(),
-                ).map_err(|e| Error::Other(e))?;
+                ).map_err(Error::Other)?;
             }
         }
 
@@ -432,7 +431,7 @@ impl Collection {
 
             // Save HNSW graph edges
             if need_hnsw_save {
-                if let (Some(ref pc), IndexBackend::Hnsw(ref graph)) = (pc.as_ref(), &self.index) {
+                if let (Some(pc), IndexBackend::Hnsw(ref graph)) = (pc.as_ref(), &self.index) {
                     if self.config.hnsw_edge_page != 0 {
                         let _ = graph.save_to_page(pc, self.config.hnsw_edge_page);
                     }

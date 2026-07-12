@@ -4,7 +4,7 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use vexra_core::collection::{Collection, IndexType};
-use vexra_core::config::{CollectionConfig, SearchQuery};
+use vexra_core::config::CollectionConfig;
 use vexra_core::DistanceMetric;
 use vexra_index::flat::FlatIndex;
 use vexra_index::hnsw::graph::HnswGraph;

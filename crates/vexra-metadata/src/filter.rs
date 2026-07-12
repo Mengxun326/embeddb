@@ -52,31 +52,31 @@ impl Filter {
     pub fn evaluate(&self, metadata: &JsonValue) -> bool {
         match self {
             Filter::Equals { field, value } => {
-                metadata.get(field).map_or(false, |v| v == value)
+                metadata.get(field) == Some(value)
             }
             Filter::GreaterThan { field, value } => {
                 metadata
                     .get(field)
                     .and_then(|v| v.as_f64())
-                    .map_or(false, |v| v > *value)
+                    .is_some_and(|v| v > *value)
             }
             Filter::LessThan { field, value } => {
                 metadata
                     .get(field)
                     .and_then(|v| v.as_f64())
-                    .map_or(false, |v| v < *value)
+                    .is_some_and(|v| v < *value)
             }
             Filter::In { field, values } => {
                 metadata
                     .get(field)
                     .and_then(|v| v.as_str())
-                    .map_or(false, |s| values.contains(s))
+                    .is_some_and(|s| values.contains(s))
             }
             Filter::Contains { field, value } => {
                 metadata
                     .get(field)
                     .and_then(|v| v.as_str())
-                    .map_or(false, |s| s.contains(value.as_str()))
+                    .is_some_and(|s| s.contains(value.as_str()))
             }
             Filter::And(left, right) => left.evaluate(metadata) && right.evaluate(metadata),
             Filter::Or(left, right) => left.evaluate(metadata) || right.evaluate(metadata),
@@ -172,11 +172,10 @@ fn find_and_or(input: &str, op: &str) -> Option<usize> {
             _ => {}
         }
 
-        if !in_quote && paren_depth == 0 {
-            if i + op_bytes.len() <= bytes.len() && &bytes[i..i + op_bytes.len()] == op_bytes {
+        if !in_quote && paren_depth == 0
+            && i + op_bytes.len() <= bytes.len() && &bytes[i..i + op_bytes.len()] == op_bytes {
                 return Some(i);
             }
-        }
         i += 1;
     }
 

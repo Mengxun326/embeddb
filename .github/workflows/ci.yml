@@ -39,7 +39,9 @@ jobs:
       - run: pip install maturin pytest
       - name: Build and install SDK
         working-directory: sdk/python
-        run: maturin develop
+        run: |
+          maturin build
+          pip install target/wheels/*.whl
       - name: Run Python tests
         working-directory: sdk/python
         run: pytest tests/ -v

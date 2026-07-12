@@ -358,5 +358,6 @@ pub unsafe extern "C" fn embeddb_delete(
 /// `db` must be a valid pointer or null.
 #[no_mangle]
 pub unsafe extern "C" fn embeddb_error(_db: *mut EmbedDb) -> *const c_char {
-    b"An error occurred\0".as_ptr() as *const c_char
+    #[allow(clippy::manual_c_str_literals)]
+    { b"An error occurred\0".as_ptr() as *const c_char }
 }

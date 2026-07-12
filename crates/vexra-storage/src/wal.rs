@@ -147,7 +147,7 @@ impl WalManager {
         // Compute checksums
         let s1 = self.salt1.load(std::sync::atomic::Ordering::Relaxed);
         let s2 = self.salt2.load(std::sync::atomic::Ordering::Relaxed);
-        let (checksum1, checksum2) = Self::compute_frame_checksum(page_number, &page_data, s1, s2, 0);
+        let (checksum1, checksum2) = Self::compute_frame_checksum(page_number, page_data, s1, s2, 0);
 
         frame_header[20..24].copy_from_slice(&checksum1.to_le_bytes());
         frame_header[24..28].copy_from_slice(&checksum2.to_le_bytes());

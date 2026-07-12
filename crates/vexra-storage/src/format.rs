@@ -431,7 +431,7 @@ pub fn read_cell_pointers(header: &PageHeader, data: &[u8]) -> Vec<CellPointer> 
 }
 
 /// Get the data of a specific cell by its pointer.
-pub fn read_cell_data<'a>(data: &'a [u8], ptr: CellPointer) -> &'a [u8] {
+pub fn read_cell_data(data: &[u8], ptr: CellPointer) -> &[u8] {
     let start = ptr.0 as usize;
     let end = start + ptr.1 as usize;
     if end > data.len() {
