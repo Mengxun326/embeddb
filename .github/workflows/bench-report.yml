@@ -22,14 +22,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Run benchmarks
-        run: cargo bench -p vexra-core -- --output-format bencher | tee bench-results.txt
+        run: cargo bench -p vexra-core
       - name: Generate report
         run: |
           mkdir -p _site
-          echo "<h1>Vexra Benchmarks</h1><pre>" > _site/index.html
-          cat bench-results.txt >> _site/index.html
-          echo "</pre>" >> _site/index.html
-          cp -r target/criterion _site/ 2>/dev/null || true
+          cp -r target/criterion/* _site/ 2>/dev/null || true
+          echo "<h1>Vexra Benchmarks</h1>" > _site/index.html
+          echo "<p>See <a href='report/index.html'>criterion report</a></p>" >> _site/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
