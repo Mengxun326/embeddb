@@ -180,22 +180,41 @@ pub struct Collection {
 
 impl Collection {
     /// Collect all tombstone document IDs from a page.
-    /// Write a vector cell to the current data page. If the page is full, allocate a new one.
+    /// Generic helper: write a cell to a page chain (root + overflow), allocating new pages as needed.
     /// Returns true if the cell was written successfully.
-    fn write_vector_cell(&mut self, pc: &Arc<PageCache>, cell: &[u8]) -> Result<bool> {
-        // Try the last allocated data page first (fast path)
-        let last_page = self.config.data_pages.last().copied().unwrap_or(self.config.data_root_page);
+    fn write_cell_with_overflow(
+        pc: &Arc<PageCache>, page_type: PageType,
+        root_page: &mut u64, overflow_pages: &mut Vec<u64>, cell: &[u8],
+    ) -> Result<bool> {
+        // Try the last allocated page first (fast path)
+        let last_page = overflow_pages.last().copied().unwrap_or(*root_page);
         let written = pc.write_cell(last_page, cell, None).map_err(Error::Storage)?;
         if written { return Ok(true); }
 
         // Page is full — allocate a new one
-        let new_page = pc.allocate_page(PageType::Vector, 0).map_err(Error::Storage)?;
+        let new_page = pc.allocate_page(page_type, 0).map_err(Error::Storage)?;
         let written = pc.write_cell(new_page, cell, None).map_err(Error::Storage)?;
         if written {
-            self.config.data_pages.push(new_page);
+            overflow_pages.push(new_page);
             return Ok(true);
         }
-        Ok(false) // Should not happen on a fresh page
+        Ok(false)
+    }
+
+    /// Write a vector cell (delegates to the generic helper).
+    fn write_vector_cell(&mut self, pc: &Arc<PageCache>, cell: &[u8]) -> Result<bool> {
+        Self::write_cell_with_overflow(
+            pc, PageType::Vector,
+            &mut self.config.data_root_page, &mut self.config.data_pages, cell,
+        )
+    }
+
+    /// Write a metadata cell (delegates to the generic helper).
+    fn write_metadata_cell(&mut self, pc: &Arc<PageCache>, cell: &[u8]) -> Result<bool> {
+        Self::write_cell_with_overflow(
+            pc, PageType::Metadata,
+            &mut self.config.metadata_root_page, &mut self.config.metadata_pages, cell,
+        )
     }
 
     fn collect_tombstones(&self, pg: &vexra_storage::page_cache::CachedPage) -> std::collections::HashSet<String> {
@@ -328,7 +347,7 @@ impl Collection {
         Ok(())
     }
 
-    /// Load metadata from the metadata page.
+    /// Load metadata from all metadata pages.
     fn load_metadata(&mut self) -> Result<()> {
         let pc = match self.page_cache.as_ref() {
             Some(pc) => pc,
@@ -336,14 +355,17 @@ impl Collection {
         };
         if self.config.metadata_root_page == 0 { return Ok(()); }
 
-        let page = pc.get_page(self.config.metadata_root_page).map_err(Error::Storage)?;
-        let pg = page.read();
-        let header = pg.header();
+        let mut page_ids = vec![self.config.metadata_root_page];
+        page_ids.extend_from_slice(&self.config.metadata_pages);
 
-        for i in 0..header.num_cells {
-            if let Some(data) = pg.cell_data(i) {
-                if let Some((id, meta)) = decode_metadata_cell(&data) {
-                    let _ = self.metadata.insert(&id, meta);
+        for &page_id in &page_ids {
+            let page = pc.get_page(page_id).map_err(Error::Storage)?;
+            let pg = page.read();
+            for i in 0..pg.header().num_cells {
+                if let Some(data) = pg.cell_data(i) {
+                    if let Some((id, meta)) = decode_metadata_cell(&data) {
+                        let _ = self.metadata.insert(&id, meta);
+                    }
                 }
             }
         }
@@ -364,6 +386,7 @@ impl Collection {
     pub fn config_snapshot(&self) -> CollectionConfig {
         let mut c = self.config.clone();
         c.data_pages = self.config.data_pages.clone();
+        c.metadata_pages = self.config.metadata_pages.clone();
         c
     }
 
@@ -387,14 +410,13 @@ impl Collection {
             new_id
         };
 
-        // Index vector
+        // Index + persist vector
         if let Some(ref vector) = doc.vector {
             if vector.len() != self.config.dimension {
                 return Err(Error::DimensionMismatch { expected: self.config.dimension, actual: vector.len() });
             }
-            self.index.insert(internal_id, vector)?;
 
-            // Persist vector to data page (allocate new page if full)
+            // Persist FIRST, then update in-memory index
             let need_hnsw_save = self.config.hnsw_edge_page != 0 && matches!(self.index, IndexBackend::Hnsw(_));
             let pc = self.page_cache.clone();
             let cell = encode_vector_cell(&doc_id, internal_id, vector);
@@ -404,6 +426,9 @@ impl Collection {
             if !written {
                 return Err(Error::Other("Vector data page full".into()));
             }
+
+            // Now commit to index
+            self.index.insert(internal_id, vector)?;
 
             // Save HNSW graph edges
             if need_hnsw_save {
@@ -415,18 +440,17 @@ impl Collection {
             }
         }
 
-        // Store + persist metadata
+        // Store + persist metadata (persist first, then commit in-memory)
         if let Some(ref meta) = doc.metadata {
-            self.metadata.insert(&doc_id, meta.clone())?;
-            if let Some(ref pc) = self.page_cache {
+            let pc_meta = self.page_cache.clone();
+            if let Some(ref pc) = pc_meta {
                 let cell = encode_metadata_cell(&doc_id, meta);
-                let written = pc
-                    .write_cell(self.config.metadata_root_page, &cell, None)
-                    .map_err(Error::Storage)?;
+                let written = self.write_metadata_cell(pc, &cell)?;
                 if !written {
                     return Err(Error::Other("Metadata page full".into()));
                 }
             }
+            self.metadata.insert(&doc_id, meta.clone())?;
         }
 
         Ok(doc_id)
@@ -477,20 +501,26 @@ impl Collection {
             let _ = self.index.remove(internal_id);
             self.reverse_id_map.remove(&internal_id);
 
-            // Write zero-length tombstone cell to mark deletion on disk
+            // Write tombstone to overflow-aware data pages
             if let Some(ref pc) = self.page_cache {
                 let tombstone = make_tombstone_cell(id);
-                let _ = pc.write_cell(self.config.data_root_page, &tombstone, None);
+                let _ = Self::write_cell_with_overflow(
+                    pc, PageType::Vector,
+                    &mut self.config.data_root_page, &mut self.config.data_pages, &tombstone,
+                );
             }
         }
         self.id_map.remove(id);
         let _ = self.metadata.remove(id);
 
-        // Write metadata tombstone
+        // Write metadata tombstone to overflow-aware metadata pages
         if let Some(ref pc) = self.page_cache {
             if self.config.metadata_root_page != 0 {
                 let tombstone = make_tombstone_cell(id);
-                let _ = pc.write_cell(self.config.metadata_root_page, &tombstone, None);
+                let _ = Self::write_cell_with_overflow(
+                    pc, PageType::Metadata,
+                    &mut self.config.metadata_root_page, &mut self.config.metadata_pages, &tombstone,
+                );
             }
         }
         Ok(())

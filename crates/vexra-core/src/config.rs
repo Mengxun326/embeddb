@@ -55,6 +55,10 @@ pub struct CollectionConfig {
     #[serde(default)]
     pub metadata_root_page: u64,
 
+    /// Additional metadata pages (appended when the root page is full).
+    #[serde(default)]
+    pub metadata_pages: Vec<u64>,
+
     /// Page ID for HNSW edge data (0 = not yet allocated or not using HNSW).
     #[serde(default)]
     pub hnsw_edge_page: u64,
@@ -83,6 +87,7 @@ impl CollectionConfig {
             data_root_page: 0,
             data_pages: Vec::new(),
             metadata_root_page: 0,
+            metadata_pages: Vec::new(),
             hnsw_edge_page: 0,
             index_type: "flat".to_string(),
         }
