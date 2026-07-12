@@ -17,14 +17,14 @@ Be respectful, constructive, and inclusive. Harassment of any kind will not be t
 
 ```bash
 git clone https://github.com/Mengxun326/Vexra.git
-cd embeddb
+cd Vexra
 cargo build
 cargo test
 ```
 
 ### Project Structure
 
-EmbedDB is a Rust workspace with 9 crates. See [README.md](README.md#project-structure) for details.
+Vexra is a Rust workspace with 9 crates. See [README.md](README.md#project-structure) for details.
 
 ## Development Workflow
 
